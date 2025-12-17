@@ -6,6 +6,11 @@ const crypto = require('crypto');
 const app = express();
 const port = 3000;
 
+/* Clients werden in einer Map verwaltet
+   Jeder Client erhält eine ID und eine Farbe
+   Wenn keine Farben mehr verfügbar sind, können keine weiteren Clients beitreten
+   Schließt ein Client die Connection, wird seine Farbe wieder freigegeben
+*/
 const clients = new Map();
 const colors = ["red", "green", "blue", "orange", "purple", "yellow"];
 
@@ -75,6 +80,7 @@ wss.on('connection', function connection(ws) {
             }
         });
 
+        // Farbe und id wieder freigeben
         clients.delete(ws.clientId);
         colors.push(client.color);
     });

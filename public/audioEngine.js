@@ -1,3 +1,7 @@
+/*
+    TESTKLASSE, nix endgültiges
+*/
+
 const MASTER_VOLUME_DB = -6;
 const BASS_DB = 4;
 const MID_DB = 0;

@@ -1,5 +1,5 @@
 const socket = new WebSocket('ws://' + window.location.host);
-let touchColor = "black"; // Standart Platzhalter
+let touchColor = "black"; // Standart Platzhalter falls nix durchkommt
 let myClientId = null;
 
 // Map <clientID>, <x,y,color>
@@ -57,7 +57,7 @@ socket.onmessage = (event) => {
     }
 };
 
-// Kreis zeichnen
+// Kreis zeichnen (Touchpunkte)
 function render() {
     ctx.clearRect(0, 0, canv.width, canv.height);
     
