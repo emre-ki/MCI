@@ -1,8 +1,8 @@
 const socket = new WebSocket('ws://' + window.location.host);
-let touchColor = "black"; // Standart Platzhalter falls nix durchkommt
+let touchColor = "black";
 let myClientId = null;
 
-// Map <clientID>, <x,y,color>
+// Map: "clientId-touchId", {x, y, color}
 const activeTouches = new Map();
 
 var canv = document.getElementById("canv");
@@ -15,9 +15,10 @@ socket.onopen = (event) => {
 };
 
 socket.onerror = (error) => {
-    console.error(" WebSocket Fehler:", error);
+    console.error("WebSocket Fehler:", error);
 };
 
+// Nachrichten von Server wie Events, wenn ein anderer Client sich "rumbewegt"
 socket.onmessage = (event) => {
     try {
         const data = JSON.parse(event.data);
@@ -28,7 +29,7 @@ socket.onmessage = (event) => {
             myClientId = data.clientId;
             console.log(`Meine Farbe: ${touchColor}, ID: ${myClientId}`);
             
-            // Viereck kurz am Anfang zeigen welche farbe man hat
+            // Viereck kurz am Anfang (2 sekunden) zeigen welche farbe man hat
             ctx.fillStyle = touchColor;
             ctx.fillRect(10, 10, 50, 50);
             ctx.strokeStyle = "white";
@@ -37,10 +38,12 @@ socket.onmessage = (event) => {
             
             setTimeout(() => {
                 ctx.clearRect(0, 0, canv.width, canv.height);
-            }, 1000);
+                render();
+            }, 2000);
         } 
         else if (data.action === "TOUCH_START" || data.action === "TOUCH_MOVE") {
-            activeTouches.set(data.clientId, {
+            const key = `${data.clientId}-${data.touchId}`;
+            activeTouches.set(key, {
                 x: data.x,
                 y: data.y,
                 color: data.color
@@ -48,12 +51,13 @@ socket.onmessage = (event) => {
             render();
         } 
         else if (data.action === "TOUCH_END") {
-            console.log(`Touch Ende von ${data.clientId}`);
-            activeTouches.delete(data.clientId);
+            const key = `${data.clientId}-${data.touchId}`;
+            console.log(`Touch Ende von ${key}`);
+            activeTouches.delete(key);
             render();
         }
     } catch (error) {
-        console.error("Parse Error:", error, "Raw:", event.data);
+        console.error("Parse Error:", error, "Raw Error:", event.data);
     }
 };
 
@@ -61,7 +65,7 @@ socket.onmessage = (event) => {
 function render() {
     ctx.clearRect(0, 0, canv.width, canv.height);
     
-    activeTouches.forEach((touch, clientId) => {
+    activeTouches.forEach((touch, key) => {
         ctx.beginPath();
         ctx.arc(touch.x, touch.y, 20, 0, 2 * Math.PI);
         ctx.fillStyle = touch.color;
@@ -72,11 +76,12 @@ function render() {
     });
 }
 
-function sendTouchEvent(action, x, y) {
+function sendTouchEvent(action, touchId, x, y) {
     if (socket.readyState === WebSocket.OPEN && myClientId) {
         const payload = {
             action: action,
             clientId: myClientId,
+            touchId: touchId,
             x: x,
             y: y,
             color: touchColor
@@ -87,61 +92,86 @@ function sendTouchEvent(action, x, y) {
     }
 }
 
-var hammertime = new Hammer(canv);
-hammertime.get('pan').set({ 
-    direction: Hammer.DIRECTION_ALL, 
-    threshold: 0
-});
+/*
+    touch.identifier ist ein Property von Browsern selbst, wir speichern das als touchid zum zugehörigen client
+    "The Touch.identifier returns a value uniquely identifying this point of contact with the touch surface."
+    zb Client A (rot) berührt mit 2 Fingern → Keys: "abc123-0" und "abc123-1" 
+       Client B (blau) berührt mit 1 Finger → Key: "xyz789-0"
+*/
 
-hammertime.on("panstart", function(event) {
+canv.addEventListener("touchstart", function(event) {
     if (!myClientId) {
         console.warn("ClientID noch nicht bereit, ignoriere Event");
         return;
     }
-    const x = event.center.x;
-    const y = event.center.y;
 
-    activeTouches.set(myClientId, {x, y, color: touchColor});
-    render();
-    sendTouchEvent("TOUCH_START", x, y);
-});
+    event.preventDefault();
 
-hammertime.on("tap", function(event) {
-    if (!myClientId) {
-        console.warn("ClientID noch nicht bereit, ignoriere Event");
-        return;
-    }
-    const x = event.center.x;
-    const y = event.center.y;
+    for (const touch of event.changedTouches) {
+        const x = touch.clientX;
+        const y = touch.clientY;
+        const touchId = touch.identifier;
 
-    activeTouches.set(myClientId, {x, y, color: touchColor});
-    render();
-    sendTouchEvent("TOUCH_START", x, y);
+        const key = `${myClientId}-${touchId}`;
+        activeTouches.set(key, {
+            x,
+            y,
+            color: touchColor
+        });
 
-    setTimeout(() => {
-        activeTouches.delete(myClientId);
         render();
-        sendTouchEvent("TOUCH_END", 0, 0);
-    }, 100);
+        sendTouchEvent("TOUCH_START", touchId, x, y);
+    }
 });
 
-hammertime.on("panmove", function(event) {
-    if (!myClientId) return; 
-    
-    const x = event.center.x;
-    const y = event.center.y;
-
-    activeTouches.set(myClientId, { x, y, color: touchColor });
-    render();
-    sendTouchEvent("TOUCH_MOVE", x, y);
-});
-
-hammertime.on("panend pancancel", function(event) {
+canv.addEventListener("touchmove", function(event) {
     if (!myClientId) return;
     
-    activeTouches.delete(myClientId);
-    render();
-    sendTouchEvent("TOUCH_END", 0, 0);
+    event.preventDefault();
+
+    for (const touch of event.changedTouches) {
+        const x = touch.clientX;
+        const y = touch.clientY;
+        const touchId = touch.identifier;
+
+        const key = `${myClientId}-${touchId}`;
+        activeTouches.set(key, {
+            x,
+            y,
+            color: touchColor
+        });
+
+        render();
+        sendTouchEvent("TOUCH_MOVE", touchId, x, y);
+    }
+});
+
+canv.addEventListener("touchend", function(event) {
+    if (!myClientId) return;
+    
+    event.preventDefault();
+
+    for (const touch of event.changedTouches) {
+        const touchId = touch.identifier;
+        const key = `${myClientId}-${touchId}`;
+        activeTouches.delete(key);
+        render();
+        sendTouchEvent("TOUCH_END", touchId, 0, 0);
+    }
+});
+
+canv.addEventListener("touchcancel", function(event) {
+    if (!myClientId) return;
+
+    event.preventDefault();
+
+    for (const touch of event.changedTouches) {
+        const touchId = touch.identifier;
+        const key = `${myClientId}-${touchId}`;
+        activeTouches.delete(key);
+        render();
+        sendTouchEvent("TOUCH_END", touchId, 0, 0);
+    }
 });
 
 window.addEventListener('resize', () => {
