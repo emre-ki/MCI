@@ -51,7 +51,7 @@ export default class AudioEngine {
 
     async loadAudio() {
         try {
-            const buffer = await Tone.Buffer.load("Tara.mp3");
+            const buffer = await Tone.Buffer.load("assets/song.mp3");
             this.player.buffer = buffer;
             console.log("Audio geladen!");
         } catch (err) {
@@ -59,8 +59,12 @@ export default class AudioEngine {
         }
     }
 
-    async start() {
+    async start(offset = 0) {
         if (this.audioStarted) return;
+
+        if (isNaN(offset) || offset === null || offset < 0) {
+        offset = 0;
+        }
 
         console.log("Starte AudioEngine...");
         await Tone.start();
@@ -69,10 +73,10 @@ export default class AudioEngine {
         await Tone.loaded();
         
         console.log("Starte Player...");
-        this.player.start();
+        this.player.start(Tone.now(), offset);
         this.audioStarted = true;
 
-        console.log("AudioEngine erfolgreich gestartet!");
+        console.log("AudioEngine erfolgreich gestartet");
     }
 
     setVolume(db) {

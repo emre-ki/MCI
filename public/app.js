@@ -1,14 +1,67 @@
+import { TouchClustering } from './clustering.js';
+import AudioEngine from './audioEngine.js';
+
+const audioEngine = new AudioEngine()
+const clustering = new TouchClustering();
+let globalVolume = -10;
+let syncData = { seekTime: 0, serverTime: 0, localReceiveTime: 0, isPlaying: false };
+
 const socket = new WebSocket('ws://' + window.location.host);
 let touchColor = "black";
 let myClientId = null;
 
-// Map: "clientId-touchId", {x, y, color}
 const activeTouches = new Map();
 
 var canv = document.getElementById("canv");
+const startBtn = document.getElementById("startBtn");
 canv.width = window.innerWidth;
 canv.height = window.innerHeight;
 var ctx = canv.getContext("2d");
+
+// Throttling für Audio-Updates
+let lastAudioUpdate = 0;
+const AUDIO_UPDATE_INTERVAL = 50; // nur alle 50ms updaten (20x pro Sekunde)
+
+// Smoothing für Lautstärke
+let targetVolume = -10;
+let currentVolume = -10;
+let volumeSmoothingActive = false;
+
+function smoothVolume() {
+    if (!volumeSmoothingActive) return;
+    
+    // Bewege currentVolume langsam zu targetVolume
+    const diff = targetVolume - currentVolume;
+    const step = diff * 0.3; // 30% des Weges pro Frame
+    
+    if (Math.abs(diff) > 0.1) {
+        currentVolume += step;
+        audioEngine.setVolume(currentVolume);
+        requestAnimationFrame(smoothVolume);
+    } else {
+        currentVolume = targetVolume;
+        audioEngine.setVolume(currentVolume);
+        volumeSmoothingActive = false;
+    }
+}
+
+startBtn.addEventListener("click", async () => {
+    let finalOffset = 0;
+    
+    if (syncData.isPlaying && syncData.localReceiveTime > 0) {
+        const timeSinceReceive = (Date.now() - syncData.localReceiveTime) / 1000;
+        finalOffset = syncData.seekTime + timeSinceReceive;
+        console.log(`Sync-Start: Server war bei ${syncData.seekTime.toFixed(2)}s, +${timeSinceReceive.toFixed(2)}s = ${finalOffset.toFixed(2)}s`);
+    } else {
+        console.log("Starte als erster Client bei 0s");
+        socket.send(JSON.stringify({
+            action: "START_PLAYBACK"
+        }));
+    }
+    
+    await audioEngine.start(finalOffset);
+    startBtn.style.display = "none";
+});
 
 socket.onopen = (event) => {
     console.log("WebSocket verbunden!");
@@ -18,7 +71,6 @@ socket.onerror = (error) => {
     console.error("WebSocket Fehler:", error);
 };
 
-// Nachrichten von Server wie Events, wenn ein anderer Client sich "rumbewegt"
 socket.onmessage = (event) => {
     try {
         const data = JSON.parse(event.data);
@@ -29,7 +81,6 @@ socket.onmessage = (event) => {
             myClientId = data.clientId;
             console.log(`Meine Farbe: ${touchColor}, ID: ${myClientId}`);
             
-            // Viereck kurz am Anfang (2 sekunden) zeigen welche farbe man hat
             ctx.fillStyle = touchColor;
             ctx.fillRect(10, 10, 50, 50);
             ctx.strokeStyle = "white";
@@ -55,16 +106,73 @@ socket.onmessage = (event) => {
             console.log(`Touch Ende von ${key}`);
             activeTouches.delete(key);
             render();
-        }
+        } 
+        else if (data.action === "SYNC_PLAYBACK") {
+            syncData.localReceiveTime = Date.now();
+            syncData.seekTime = data.seekTime;
+            syncData.serverTime = data.serverTime;
+            syncData.isPlaying = data.isPlaying;
+            globalVolume = data.volume;
+            targetVolume = data.volume;
+            currentVolume = data.volume;
+            
+            console.log(`Sync empfangen: seekTime=${data.seekTime.toFixed(2)}s, isPlaying=${data.isPlaying}`);
+            
+            if (data.isPlaying && !audioEngine.audioStarted) {
+                startBtn.textContent = `▶ Bei ${data.seekTime.toFixed(1)}s einsteigen`;
+                startBtn.style.display = "block";
+            }
+        } 
+        else if (data.action === "SET_VOLUME") {
+            globalVolume = data.volume;
+            targetVolume = data.volume;
+            
+            if (audioEngine.audioStarted) {
+                if (!volumeSmoothingActive) {
+                    volumeSmoothingActive = true;
+                    smoothVolume();
+                }
+            }
+            console.log("Ziel-Lautstärke gesetzt auf:", globalVolume.toFixed(2));
+        } 
     } catch (error) {
         console.error("Parse Error:", error, "Raw Error:", event.data);
     }
 };
 
-// Kreis zeichnen (Touchpunkte)
+function updateAudioFromGroups(groups) {
+    // Throttle: nur alle 50ms senden weil sonst rauscht irgendwie die audio
+    const now = Date.now();
+    if (now - lastAudioUpdate < AUDIO_UPDATE_INTERVAL) {
+        return;
+    }
+    lastAudioUpdate = now;
+    
+    const group2 = groups.find(g => g.touchCount === 2);
+    if (group2 && socket.readyState === WebSocket.OPEN && myClientId) {
+        let volDb = -60 + 60 * (1 - group2.centroid.y / canv.height);
+    
+        targetVolume = volDb;
+        
+        if (!volumeSmoothingActive && audioEngine.audioStarted) {
+            volumeSmoothingActive = true;
+            smoothVolume();
+        }
+        
+        socket.send(JSON.stringify({
+            action: "SET_VOLUME",
+            volume: volDb
+        }));
+    }
+
+}
+
 function render() {
     ctx.clearRect(0, 0, canv.width, canv.height);
     
+    const groups = clustering.findGroups(activeTouches);
+
+    // Tuchpunkte
     activeTouches.forEach((touch, key) => {
         ctx.beginPath();
         ctx.arc(touch.x, touch.y, 20, 0, 2 * Math.PI);
@@ -74,6 +182,19 @@ function render() {
         ctx.lineWidth = 3;
         ctx.stroke();
     });
+    
+    // Touchpunkt Mittelwert
+    groups.forEach(group => {
+        ctx.beginPath();
+        ctx.arc(group.centroid.x, group.centroid.y, 10, 0, 2 * Math.PI);
+        ctx.fillStyle = 'yellow';
+        ctx.fill();
+        ctx.fillStyle = 'yellow';
+        ctx.font = 'bold 20px Arial';
+        ctx.fillText(`${group.touchCount}`, group.centroid.x, group.centroid.y - 30);
+    });
+
+    updateAudioFromGroups(groups);
 }
 
 function sendTouchEvent(action, touchId, x, y) {
@@ -91,13 +212,6 @@ function sendTouchEvent(action, touchId, x, y) {
         console.warn("Kann nicht senden - Socket:", socket.readyState, "ClientID:", myClientId);
     }
 }
-
-/*
-    touch.identifier ist ein Property von Browsern selbst, wir speichern das als touchid zum zugehörigen client
-    "The Touch.identifier returns a value uniquely identifying this point of contact with the touch surface."
-    zb Client A (rot) berührt mit 2 Fingern → Keys: "abc123-0" und "abc123-1" 
-       Client B (blau) berührt mit 1 Finger → Key: "xyz789-0"
-*/
 
 canv.addEventListener("touchstart", function(event) {
     if (!myClientId) {
