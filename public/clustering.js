@@ -109,7 +109,7 @@ export class TouchClustering {
     }
 
     /**
-     * Berechnet den Mittelpunkt (Zentroid) einer Gruppe von Touches
+     * Berechnet den Mittelpunkt einer Gruppe von Touches
      */
     calculateCentroid(touches) {
         const sum = touches.reduce((acc, touch) => {

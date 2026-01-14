@@ -1,3 +1,4 @@
+const HOST = '0.0.0.0'; 
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
@@ -151,6 +152,20 @@ wss.on('connection', function connection(ws) {
     });
 });
 
-server.listen(port, () => {
-    console.log(`Server läuft auf http://localhost:${port}`);
+server.listen(port, HOST, () => {
+    const { networkInterfaces } = require('os');
+    const nets = networkInterfaces();
+    let localIp = '';
+    for (const name of Object.keys(nets)) {
+        for (const net of nets[name]) {
+            if (net.family === 'IPv4' && !net.internal) {
+                localIp = net.address;
+            }
+        }
+    }
+
+    console.log(`--- SERVER GESTARTET ---`);
+    console.log(`Lokal: http://localhost:${port}`);
+    console.log(`Uni-Netzwerk: http://${localIp}:${port}`); // url für clients
+    console.log(`------------------------`);
 });
