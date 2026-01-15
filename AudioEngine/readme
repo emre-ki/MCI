@@ -1,0 +1,11 @@
+python3(.13) -m venv audioengine
+source audioengine/bin/activate
+python3.13 -m pip install pyo
+
+dependencies zu installieren:
+- portaudio (macos only?)
+- sndfile
+- portmidi
+- liblo
+- wxpython
+- pyo vermutlich selbst zu builden
