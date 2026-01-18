@@ -1,19 +1,55 @@
+from pyo import Server
+from pyo import SfPlayer
 from pyo import *
-s = Server()
-s.boot()
-#s.setOutputDevice(4)
-s.start()
 
-#print "output", pa_get_output_devices()
-#print "input", pa_get_input_devices()
+
+
+def start_song():
+    sf_bass.out()
+    sf_drums.out()
+    sf_instr.out()
+    sf_vocals.out()
+    return
+
+def mute_track(player):
+    player.setMul(0)
+    return
+
+def set_track(new_track):
+    song_pfad = new_track
+    sf_bass =   SfPlayer(f"{base_pfad}/{song_pfad}/Bass.mp3").out()
+    sf_drums =  SfPlayer(f"{base_pfad}/{song_pfad}/Drums.mp3").out()
+    sf_instr =  SfPlayer(f"{base_pfad}/{song_pfad}/Instruments.mp3").out()
+    sf_vocals = SfPlayer(f"{base_pfad}/{song_pfad}/Vocals.mp3").out()
+    return
+
+
+def set_speed(new_speed):
+    sf_bass.setSpeed(new_speed)
+    sf_drums.setSpeed(new_speed)
+    sf_instr.setSpeed(new_speed)
+    sf_vocals.setSpeed(new_speed)
+    return
+
+def seek_to(second):
+    sf_bass.setOffset(second)
+    sf_drums.setOffset(second)
+    sf_instr.setOffset(second)
+    sf_vocals.setOffset(second)
 
 base_pfad="musik_files"
+song_pfad="KanyeWest-FlashingLights"
 #song_pfad="AmrDiab-NourElEin"
-song_pfad="Bi2-Varvara"
+#song_pfad="Bi2-Varvara"
 
-sf_bass = SfPlayer(f"{base_pfad}/{song_pfad}/Bass.mp3", speed=1, loop=True).out()
-#sf_drums = SfPlayer(f"{base_pfad}/{song_pfad}/Drums.mp3", speed=1, loop=True).out()
-sf_instr = SfPlayer(f"{base_pfad}/{song_pfad}/Instruments.mp3", speed=1, loop=True).out()
-sf_vocals = SfPlayer(f"{base_pfad}/{song_pfad}/Vocals.mp3", speed=1, loop=True).out()
+s = Server()
+s.boot()
+s.start()
+
+sf_bass =   SfPlayer(f"{base_pfad}/{song_pfad}/Bass.mp3").out()
+sf_drums =  SfPlayer(f"{base_pfad}/{song_pfad}/Drums.mp3").out()
+sf_instr =  SfPlayer(f"{base_pfad}/{song_pfad}/Instruments.mp3").out()
+sf_vocals = SfPlayer(f"{base_pfad}/{song_pfad}/Vocals.mp3").out()
+
 
 s.gui(locals())
