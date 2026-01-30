@@ -13,6 +13,7 @@
 
 [ ] Seeking im Song durch (spaeter) "Drehung"
     - dynamisch, wie Schallplatte so mit Pitchaenderung etc
+    - evtll durch gradialen Speedup statt seeken?
 
 [ ] Geschwindigkeit aendern
     - dynamisch, wie Schallplatte so mit Pitchaenderung etc

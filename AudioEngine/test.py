@@ -1,6 +1,7 @@
 from pyo import Server
 from pyo import SfPlayer
 from pyo import *
+import time
 
 
 
@@ -25,6 +26,32 @@ def set_track(new_track):
 
 
 def set_speed(new_speed):
+    sf_bass.setSpeed(new_speed)
+    sf_drums.setSpeed(new_speed)
+    sf_instr.setSpeed(new_speed)
+    sf_vocals.setSpeed(new_speed)
+    return
+
+def scrub_speed(new_speed):
+
+    newSpeed = sf_bass.speed
+    if newSpeed < new_speed:
+        while newSpeed < new_speed:
+            newSpeed += 0.012
+            sf_bass.setSpeed(newSpeed)
+            sf_drums.setSpeed(newSpeed)
+            sf_instr.setSpeed(newSpeed)
+            sf_vocals.setSpeed(newSpeed)
+            time.sleep(0.03)
+    else:
+        while newSpeed > new_speed:
+            newSpeed -= 0.012
+            sf_bass.setSpeed(newSpeed)
+            sf_drums.setSpeed(newSpeed)
+            sf_instr.setSpeed(newSpeed)
+            sf_vocals.setSpeed(newSpeed)
+            time.sleep(0.03)
+    
     sf_bass.setSpeed(new_speed)
     sf_drums.setSpeed(new_speed)
     sf_instr.setSpeed(new_speed)
