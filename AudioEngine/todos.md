@@ -1,21 +1,22 @@
 ## Sehr wichtig
 
 [ ] connecten einer Zentraleinheit mit diese Backend (evtll eher ein REST/Websocket ding)
+    -> immernoch noetig???
 
-[ ] Tracks dynamisch (ent)laden koennen
+[*] Tracks dynamisch (ent)laden koennen
     - wenn Song geladen wird, direkt Playback starten
     - alle Spuren korrekt neuladen
 
-[ ] Einzelne Spuren (ent)muten koennen
+[*] Einzelne Spuren (ent)muten koennen
     - Spur soll nicht von vorne anfangen, sondern bei der Position des restlichen Liedes weiterspielen
 
-[ ] Lautstaerke fuer einzelne Spuren anpassen
+[*] Lautstaerke fuer einzelne Spuren anpassen
 
 [ ] Seeking im Song durch (spaeter) "Drehung"
     - dynamisch, wie Schallplatte so mit Pitchaenderung etc
     - evtll durch gradialen Speedup statt seeken?
 
-[ ] Geschwindigkeit aendern
+[*] Geschwindigkeit aendern
     - dynamisch, wie Schallplatte so mit Pitchaenderung etc
 
 [ ] Effekte chainen koennen
@@ -31,3 +32,9 @@
     [ ] ...
     [ ] ...
 
+
+
+
+### Probleme:
+- Phase beim Laden von Songs wird nicht zurückgesetzt
+- Muten pro Track geht nicht
