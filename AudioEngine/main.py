@@ -49,6 +49,9 @@ def main():
             if len(cmd_split) > 1:
                 [channels[i].seek(float(cmd_split[1])) for i in range(4)]
 
+        elif cmd_split[0] == "phase":
+            [channels[i].get_phasor_phase() for i in range(4)]
+
         return
     
     def handle_fx_cmd(cmd):

@@ -1,4 +1,5 @@
 from pyo import *
+from .effects import EffectsFactory
 
 class AudioChannel:
     def __init__(self, channel_id):
@@ -30,6 +31,8 @@ class AudioChannel:
         self.player.setMul(self.amp)
         self.player.out()
 
+    def get_phasor_phase(self):
+        print(f"Phase von Phasor: {self.phasor.phase}")
     
     def load(self, filepath):
         print(f"{filepath}/{self.track_type}.mp3")
@@ -38,8 +41,8 @@ class AudioChannel:
         duration = self.table.getDur()
         if duration > 0:
             self.phasor.setFreq(self.speed_val.value / duration)
-            self.player.setIndex(Sig(0))
-            #self.phasor.setPhase(0.0) # An Anfang spulen
+            self.phasor.setPhase(0.0) # An Anfang spulen
+            self.player.setIndex(self.phasor)
             #self.player.setFreq(self.speed_val / duration)
             #self.player.setPhase(0) # An Anfang spulen
 
@@ -75,7 +78,8 @@ class AudioChannel:
 
     def seek(self, position):
         pos = max(0.0, min(1.0, float(position)))
-        #self.phasor.setPhase(pos)
+        self.phasor.setPhase(position) # An Anfang spulen
+        self.player.setIndex(self.phasor)
         self.player.setIndex(SigTo(value=self.table.getRate()*position, time=0.25))
 
     def set_vol(self, volume):
@@ -83,8 +87,29 @@ class AudioChannel:
         #self.amp.value = volume
         return
 
-    def effect_add(self, fx_type):
+    def effect_add(self, fx_type, y):
         print(f"\tHinzufuegen von Effekttyp {fx_type}")
+        if not self.player: return
+
+        # Wrapper fuer Effekte von Factory
+        fx_wrapper = EffectsFactory.create(fx_type, self.last_signal_source, y)
+        
+        if fx_wrapper is None: return
+
+        if self.last_amp: self.last_amp.value = 0
+        new_amp = SigTo(1, time=0.05, init=1)
+        
+        # WICHTIG: Wir greifen auf fx_wrapper.node zu für das Audio-Routing
+        fx_wrapper.node.mul(new_amp).mul(self.output_mix)
+        
+        # Speichern: Wir merken uns den Wrapper UND den Amp
+        self.active_effects.append({
+            'wrapper': fx_wrapper,  # <-- Hier liegt unsere Steuerung
+            'amp': new_amp
+        })
+        
+        self.last_signal_source = fx_wrapper.node
+        self.last_amp = new_amp
 
     def effect_rm(self, id):
         # effects.remove([]) evtll mit list comprehension, jetzt erstmal nur per index
