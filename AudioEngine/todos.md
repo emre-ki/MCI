@@ -33,8 +33,10 @@
     [ ] ...
 
 
-
+add [channel] [effekt] -> gibt ID?
+remove [channel] [id]
+set [channel] [id] [param x/y] [value]
 
 ### Probleme:
 - Phase beim Laden von Songs wird nicht zurückgesetzt
-- Muten pro Track geht nicht
+- Index macht faxen, pointer ka wie man den benutzt

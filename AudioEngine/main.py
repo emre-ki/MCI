@@ -51,8 +51,27 @@ def main():
 
         return
     
+    def handle_fx_cmd(cmd):
+        cmd_split = cmd.split()
+        if len(cmd_split) <= 1: return
+
+        print(cmd_split)
+        ch_index = int(cmd_split[1])
+        if cmd_split[0] == "set":
+            if len(cmd_split) > 4:
+                channels[ch_index].effect_set(cmd_split[2], cmd_split[3], cmd_split[4])
+
+        if cmd_split[0] == "add":
+            if len(cmd_split) > 2:
+                channels[ch_index].effect_add(cmd_split[2])
+
+        if cmd_split[0] == "rm":
+            if len(cmd_split) > 2:
+                channels[ch_index].effect_rm(cmd_split[2])
+
+    
     # Fuer testzwecke: CLI aktivieren
-    cli = AudioShell(handle_cmd)
+    cli = AudioShell(handle_cmd, handle_fx_cmd)
     try:
         cli.cmdloop()
     except KeyboardInterrupt:

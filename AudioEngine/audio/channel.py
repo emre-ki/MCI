@@ -15,36 +15,31 @@ class AudioChannel:
                 self.track_type = "Vocals"
 
         self.muted = False
-    #   self.player = SfPlayer("", speed=1, loop=True)
-    #   self.effects = []
-    #   # Start Routing?
-    #   self.player.out()
 
         # Statt SfPlayer lieber SndTable
         self.table = SndTable(initchnls=2) # Leere Table beim Start
         self.speed_val = SigTo(value=1.0, time=2.5, init=1.0) # glaettung von aenderungen
-        self.phasor = Osc(table=self.table, freq=0) #, loop=True) # "Abspielkopf", Freq 0 -> stehender Kopf
+        self.phasor = Phasor(freq=0) #, loop=True) # "Abspielkopf", Freq 0 -> stehender Kopf
+        self.player = Pointer(table=self.table, index=self.phasor)
 
         # Output Routing
         self.amp = SigTo(1, time=0.55)
         self.effects = []
-        self.phasor.setMul(self.amp)
-        self.phasor.out()
-    #   self.player.setMul(self.amp)
-    #   self.player.out()
+    #   self.phasor.setMul(self.amp)
+    #   self.phasor.out()
+        self.player.setMul(self.amp)
+        self.player.out()
 
     
     def load(self, filepath):
-    #   self.player.path = filepath
-    #   self.player.play()
-    #   return
         print(f"{filepath}/{self.track_type}.mp3")
         self.table.setSound(f"{filepath}/{self.track_type}.mp3")
 
         duration = self.table.getDur()
         if duration > 0:
             self.phasor.setFreq(self.speed_val.value / duration)
-            self.phasor.setPhase(0.0) # An Anfang spulen
+            self.player.setIndex(Sig(0))
+            #self.phasor.setPhase(0.0) # An Anfang spulen
             #self.player.setFreq(self.speed_val / duration)
             #self.player.setPhase(0) # An Anfang spulen
 
@@ -80,11 +75,21 @@ class AudioChannel:
 
     def seek(self, position):
         pos = max(0.0, min(1.0, float(position)))
-        self.phasor.setPhase(pos)
+        #self.phasor.setPhase(pos)
+        self.player.setIndex(SigTo(value=self.table.getRate()*position, time=0.25))
 
     def set_vol(self, volume):
         self.phasor.setMul(volume)
         #self.amp.value = volume
         return
 
-    # def add_effect(self, ...)
+    def effect_add(self, fx_type):
+        print(f"\tHinzufuegen von Effekttyp {fx_type}")
+
+    def effect_rm(self, id):
+        # effects.remove([]) evtll mit list comprehension, jetzt erstmal nur per index
+        print(f"\tEntferne Effekt an Stelle {id}")
+        #effects.remove(id)
+
+    def effect_set(self, id, param, value):
+        print(f"\tSetze Parameter {param} von Effekt {id} gleich {value}")
