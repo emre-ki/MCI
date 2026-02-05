@@ -27,6 +27,7 @@ class Effect:
 class EffectsFactory:
     def create(fx_type, input_signal, y_init):
         x_init = 1
+        y_init = float(y_init)
 
         def make_sig(val): return SigTo(val, time=0.05, init=val)
 

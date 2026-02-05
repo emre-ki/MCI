@@ -12,7 +12,7 @@
 
 [*] Lautstaerke fuer einzelne Spuren anpassen
 
-[ ] Seeking im Song durch (spaeter) "Drehung"
+[*] Seeking im Song durch (spaeter) "Drehung"
     - dynamisch, wie Schallplatte so mit Pitchaenderung etc
     - evtll durch gradialen Speedup statt seeken?
 
@@ -33,10 +33,9 @@
     [ ] ...
 
 
-add [channel] [effekt] -> gibt ID?
+add [channel] [effekt] [param y] -> gibt ID?
 remove [channel] [id]
 set [channel] [id] [param x/y] [value]
 
 ### Probleme:
-- Phase beim Laden von Songs wird nicht zurückgesetzt
 - Index macht faxen, pointer ka wie man den benutzt

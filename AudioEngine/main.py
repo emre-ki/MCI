@@ -65,8 +65,8 @@ def main():
                 channels[ch_index].effect_set(cmd_split[2], cmd_split[3], cmd_split[4])
 
         if cmd_split[0] == "add":
-            if len(cmd_split) > 2:
-                channels[ch_index].effect_add(cmd_split[2])
+            if len(cmd_split) > 3:
+                channels[ch_index].effect_add(cmd_split[2], cmd_split[3])
 
         if cmd_split[0] == "rm":
             if len(cmd_split) > 2:
