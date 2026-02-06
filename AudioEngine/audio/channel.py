@@ -47,7 +47,7 @@ class AudioChannel:
 
         duration = self.table.getDur()
         if duration > 0:
-            self.output.setInput(self.player)
+            #self.output.setInput(self.player)
             self.phasor.setFreq(self.speed_val.value / duration)
             self.phasor.reset() # An Anfang spulen
             #self.player.setIndex(self.phasor)
@@ -134,3 +134,19 @@ class AudioChannel:
 
     def effect_set(self, id, param, value):
         print(f"\tSetze Parameter {param} von Effekt {id} gleich {value}")
+        
+        if id >= len(self.effects):
+            return
+
+       #print(self.effects[id])
+       #return
+        
+        if param == 'x':
+            self.effects[id]["wrapper"].set_x(value)
+        elif param == 'y':
+            self.effects[id]["wrapper"].set_y(value)
+        else:
+            print("Parameter ist nicht x oder y")
+            return
+
+
