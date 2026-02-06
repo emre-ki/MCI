@@ -24,14 +24,18 @@ class AudioChannel:
         self.player = Pointer(table=self.table, index=self.phasor)
 
         # Output Routing
-        self.amp = SigTo(1, time=0.55)
+        self.amp = SigTo(1, time=0.5)
         self.effects = []
-    #   self.phasor.setMul(self.amp)
-    #   self.phasor.out()
         self.player.setMul(self.amp)
         self.player.out()
 
-        self.last_signal_source = self.player
+        #self.output = SigTo(1, time=0.5, init=1)
+        self.output = Switch(input=self.player, outs=1)
+        self.output.out()
+        #self.fx_output = None #Switch(input=None, outs=1)
+        #self.fx_output.out()
+
+        self.last_input = self.player
         self.last_amp = self.amp
 
     def get_phasor_phase(self):
@@ -43,16 +47,14 @@ class AudioChannel:
 
         duration = self.table.getDur()
         if duration > 0:
+            self.output.setInput(self.player)
             self.phasor.setFreq(self.speed_val.value / duration)
             self.phasor.reset() # An Anfang spulen
-            self.player.setIndex(self.phasor)
-            #self.player.setFreq(self.speed_val / duration)
-            #self.player.setPhase(0) # An Anfang spulen
+            #self.player.setIndex(self.phasor)
 
     def toggle_mute(self):
         self.muted = not self.muted
         self.player.setMul(0 if self.muted else 1)
-        #self.amp.value = 0 if self.muted else 1
         return
 
     def set_speed(self, speed):
@@ -86,8 +88,8 @@ class AudioChannel:
         self.phasor.setPhase(pos) 
 
     def set_vol(self, volume):
-        self.player.setMul(volume)
-        #self.amp.value = volume
+        #self.player.setMul(volume)
+        self.amp.value = volume
         return
 
     def effect_add(self, fx_type, y):
@@ -95,20 +97,21 @@ class AudioChannel:
         if not self.player:
             return
 
-        # Wrapper fuer Effekte von Factory
-        fx_wrapper = EffectsFactory.create(fx_type, self.last_signal_source, y)
+        # Factory Effekt erstellen lassen
+        fx_wrapper = EffectsFactory.create(fx_type, self.last_input, y)
         
         if fx_wrapper is None:
             return
 
-        if self.last_amp:
-            self.last_amp.value = 0
+       #if self.last_amp:
+       #    self.last_amp.value = 0
 
-        new_amp = SigTo(1, time=0.05, init=1)
+        new_amp = SigTo(1, time=0.5, init=1)
         
         # WICHTIG: Wir greifen auf fx_wrapper.node zu für das Audio-Routing
-        new_amp.setMul(self.player)
-        fx_wrapper.node.setMul(new_amp)
+        #new_amp.mul = self.player
+        #fx_wrapper.node.mul = new_amp
+        fx_wrapper.mix_node.setMul(new_amp)
         #fx_wrapper.node.setMul(self.output_mix)
         
         # Speichern: Wir merken uns den Wrapper UND den Amp
@@ -117,8 +120,12 @@ class AudioChannel:
             'amp': new_amp
         })
         
-        self.last_signal_source = fx_wrapper.node
+        self.last_input = fx_wrapper.mix_node
         self.last_amp = new_amp
+
+        self.output.setInput(self.last_input)
+        #self.output = Switch(self.last_input, outs=1)
+        #self.output.out()
 
     def effect_rm(self, id):
         # effects.remove([]) evtll mit list comprehension, jetzt erstmal nur per index
