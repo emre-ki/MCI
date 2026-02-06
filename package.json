@@ -13,6 +13,7 @@
   "dependencies": {
     "express": "^5.2.1",
     "socket.io": "^4.8.1",
+    "the-finger": "^1.0.3",
     "tone": "^15.1.22",
     "ws": "^8.18.3"
   }

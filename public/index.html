@@ -1,12 +1,25 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>TUI Multi-Touch Controller</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <canvas id="canv"></canvas>
-    <script src="app.js"></script>
+    
+    <!-- Info Overlay -->
+    <div id="gesture-info">
+        <h3>🎛️ TUI Controller</h3>
+        <div id="active-gestures"></div>
+    </div>
+    
+    <!-- Load The Finger from CDN -->
+    <script src="https://unpkg.com/the-finger/dist/thefinger.min.js"></script>
+    
+    <!-- Load our app -->
+    <script src="app-thefinger.js"></script>
 </body>
 </html>

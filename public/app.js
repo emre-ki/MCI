@@ -1,3 +1,9 @@
+import TheFinger from 'the-finger';
+
+const element = document.getElementById('canv');
+const finger = new TheFinger(element);
+
+
 const socket = new WebSocket('ws://' + window.location.host);
 let touchColor = "black";
 let myClientId = null;
