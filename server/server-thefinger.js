@@ -8,22 +8,31 @@ const port = 3000;
 
 // Client Management
 const clients = new Map();
-const colors = ["red", "green", "blue", "orange", "purple", "yellow"];
+const colors = ["red", "green", "blue", "orange", "purple", "yellow"]; // 6 Clients Gleichzeitig, können das aber erweitern immer
 
-// Audio State (simplified - extend with your audio engine)
+// Audio State (TEmporär)
 let audioState = {
-    volume: 1.0,
-    speed: 1.0,
-    bass: 0.5,
-    reverb: 0.3,
-    drums: 0.5,
-    instruments: 0.5,
-    vocals: 0.5
+    volume: 1.0,      // 1 Finger
+    speed: 1.0,       // 2 Finger
+    bass: 0.5,        // 3 Finger
+    drums: 0.5,       // 4 Finger
+    instruments: 0.5, // 5 Finger
+    vocals: 0.5,      // Rotation 
+    reverb: 0.3       // noch nicht drin
+};
+
+// Mapping: Finger Count -> Parameter
+const fingerCountMap = {
+    1: 'volume',
+    2: 'speed',
+    3: 'bass',
+    4: 'drums',
+    5: 'instruments'
 };
 
 function addClient() {
     if (colors.length === 0) {
-        console.warn("⚠️  Keine Farben verfügbar");
+        console.warn("Keine Farben verfügbar");
         return null;
     }
     const color = colors.shift();
@@ -46,110 +55,85 @@ wss.on('connection', function connection(ws) {
     }
     
     ws.clientId = client.id;
-    console.log(`✓ Client ${client.id} connected (${client.color})`);
+    console.log(` Client ${client.id} verbunden (${client.color})`);
 
-    // Send color assignment
+    // Send color assignment + current audio state
     ws.send(JSON.stringify({
         action: "SET_COLOR",
         color: client.color,
         clientId: client.id
+    }));
+    
+    // Send current audio state to new client
+    ws.send(JSON.stringify({
+        action: "AUDIO_STATE_UPDATE",
+        state: audioState
     }));
 
     ws.on('message', function incoming(rawMsg) {
         try {
             const message = JSON.parse(rawMsg.toString());
             
-            // === RAW TOUCH EVENTS (for multi-client clustering) ===
+            // === RAW TOUCH EVENTS (for clustering across clients) ===
             if (message.action === "TOUCH_START" || 
                 message.action === "TOUCH_MOVE" || 
                 message.action === "TOUCH_END") {
-                
-                // Broadcast to ALL clients
-                wss.clients.forEach(function each(wsClient) {
-                    if (wsClient.readyState === WebSocket.OPEN) {
-                        wsClient.send(JSON.stringify(message));
-                    }
-                });
             }
             
-            // === THE FINGER GESTURES - SPATIAL ONLY ===
-            
-            // ROTATION Gesture
+            // ROTATION Gesture - always controls VOCALS
             else if (message.action === "GESTURE_ROTATE") {
-                console.log(`🔄 Rotate from ${client.id}: ${message.parameter} ${message.change > 0 ? '+' : ''}${message.change.toFixed(3)}`);
+                const parameter = 'vocals';
+                console.log(`🔄 Rotate from ${client.color}: ${parameter} (${message.fingerCount} fingers) ${message.change > 0 ? '+' : ''}${message.change.toFixed(3)}`);
                 
-                updateParameter(message.parameter, message.change, message.track);
-                broadcastParameterUpdate(message.parameter);
+                updateParameter(parameter, message.change);
+                broadcastParameterUpdate(parameter);
             }
             
-            // VERTICAL SWIPE Gesture
+            // VERTICAL SWIPE Gesture - parameter based on finger count
             else if (message.action === "GESTURE_VERTICAL") {
-                console.log(`↕️  Vertical from ${client.id}: ${message.direction} | ${message.parameter}`);
+                const parameter = fingerCountMap[message.fingerCount] || 'volume';
+                console.log(`↕️  Vertical from ${client.color}: ${message.direction} | ${parameter} (${message.fingerCount} fingers)`);
                 
-                updateParameter(message.parameter, message.change, message.track);
-                broadcastParameterUpdate(message.parameter);
+                updateParameter(parameter, message.change);
+                broadcastParameterUpdate(parameter);
             }
             
-            // HORIZONTAL SWIPE Gesture
+            // HORIZONTAL SWIPE Gesture - parameter based on finger count
             else if (message.action === "GESTURE_HORIZONTAL") {
-                console.log(`↔️  Horizontal from ${client.id}: ${message.direction} | ${message.parameter}`);
+                const parameter = fingerCountMap[message.fingerCount] || 'volume';
+                console.log(`↔️  Horizontal from ${client.color}: ${message.direction} | ${parameter} (${message.fingerCount} fingers)`);
                 
-                updateParameter(message.parameter, message.change, message.track);
-                broadcastParameterUpdate(message.parameter);
-            }
-            
-            // LONG-PRESS (Solo Mode)
-            else if (message.action === "GESTURE_SOLO") {
-                console.log(`⏰ Solo Mode: ${message.track}`);
-                
-                // Mute all other tracks
-                soloTrack(message.track);
-                broadcastAudioState();
-            }
-            
-            // FLICK Gesture
-            else if (message.action === "GESTURE_FLICK") {
-                console.log(`⚡ Flick from ${client.id}: ${message.direction} speed=${message.speed.toFixed(2)}`);
-                
-                updateParameter(message.parameter, message.change, message.track);
-                broadcastParameterUpdate(message.parameter);
+                updateParameter(parameter, message.change);
+                broadcastParameterUpdate(parameter);
             }
             
         } catch (error) {
-            console.error("❌ Parse Error:", error);
+            console.error("Parse Error:", error);
         }
     });
 
     ws.on('close', () => {
-        console.log(`✗ Client ${client.id} disconnected`);
-
-        // Broadcast TOUCH_END
-        wss.clients.forEach(function each(wsClient) {
-            if (wsClient.readyState === WebSocket.OPEN) {
-                wsClient.send(JSON.stringify({
-                    action: "TOUCH_END",
-                    clientId: client.id
-                }));
-            }
-        });
-
-        // Release color
+        console.log(`Client ${client.id} disconnected`);
         clients.delete(ws.clientId);
         colors.push(client.color);
+        broadcastClientCount();
     });
 
     ws.on('error', (error) => {
-        console.error(`❌ WebSocket Error ${client.id}:`, error);
+        console.error(`WebSocket Error ${client.id}:`, error);
     });
+    
+    // Notify all clients about new connection
+    broadcastClientCount();
 });
 
 // ============================================
 // Audio Parameter Management
 // ============================================
 
-function updateParameter(parameter, change, track = null) {
+function updateParameter(parameter, change) {
     if (!(parameter in audioState)) {
-        console.warn(`⚠️  Unknown parameter: ${parameter}`);
+        console.warn(`Unknown parameter: ${parameter}`);
         return;
     }
     
@@ -165,31 +149,14 @@ function updateParameter(parameter, change, track = null) {
     
     audioState[parameter] = newValue;
     
-    const trackInfo = track ? ` [${track}]` : ' [ALL]';
-    console.log(`   → ${parameter}${trackInfo}: ${audioState[parameter].toFixed(2)}`);
+    console.log(`   → ${parameter}: ${audioState[parameter].toFixed(2)}`);
     
     // TODO: Send to your Python audio engine here
     // sendToAudioEngine({
     //     action: "UPDATE_PARAMETER",
     //     parameter: parameter,
-    //     value: audioState[parameter],
-    //     track: track
+    //     value: audioState[parameter]
     // });
-}
-
-function soloTrack(track) {
-    // Mute all except selected
-    const tracks = ['bass', 'drums', 'instruments', 'vocals'];
-    
-    tracks.forEach(t => {
-        if (t === track) {
-            audioState[t] = 1.0;  // Full volume
-        } else {
-            audioState[t] = 0.0;  // Muted
-        }
-    });
-    
-    console.log(`   → Solo mode: ${track} ON, others OFF`);
 }
 
 function broadcastParameterUpdate(parameter) {
@@ -219,24 +186,30 @@ function broadcastAudioState() {
     });
 }
 
-// ============================================
-// Server Start
-// ============================================
+function broadcastClientCount() {
+    const message = JSON.stringify({
+        action: "CLIENT_COUNT_UPDATE",
+        count: clients.size,
+        colors: Array.from(clients.values()).map(c => c.color)
+    });
+    
+    wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+        }
+    });
+}
 
 server.listen(port, () => {
     console.log(`
-╔════════════════════════════════════════╗
-║  TUI Server with The Finger            ║
-║  → http://localhost:${port}              ║
-║  SPATIAL GESTURES ONLY                 ║
-╚════════════════════════════════════════╝
-
-Supported Gestures:
-  🔄 Rotate       → Volume/Parameter
-  ↕️  Vertical    → Main Control
-  ↔️  Horizontal  → Speed/Seek
-  ⚡ Flick        → Quick Change
-  👆👆 Two-Tap     → Track Select
-  ⏰ Long-Press   → Solo Mode
+Gesture Mapping:
+  🔄 Rotation (any)    → VOCALS
+  ↕️↔️ 1 Finger        → VOLUME
+  ↕️↔️ 2 Fingers       → SPEED
+  ↕️↔️ 3 Fingers       → BASS
+  ↕️↔️ 4 Fingers       → DRUMS
+  ↕️↔️ 5 Fingers       → INSTRUMENTS
+  
+  → http://localhost:${port}
     `);
 });
