@@ -30,6 +30,7 @@ const fingerCountMap = {
     5: 'instruments'
 };
 
+// CLient management 
 function addClient() {
     if (colors.length === 0) {
         console.warn("Keine Farben verfügbar");
@@ -80,9 +81,9 @@ wss.on('connection', function connection(ws) {
                 message.action === "TOUCH_END") {
             }
             
-            // ROTATION Gesture - always controls VOCALS
+            // ROTATION Gesture - 
             else if (message.action === "GESTURE_ROTATE") {
-                const parameter = 'vocals';
+                const parameter = 'volume';
                 console.log(`🔄 Rotate from ${client.color}: ${parameter} (${message.fingerCount} fingers) ${message.change > 0 ? '+' : ''}${message.change.toFixed(3)}`);
                 
                 updateParameter(parameter, message.change);

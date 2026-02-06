@@ -177,79 +177,55 @@ finger.track('rotate', (gesture, touchHistory) => {
         fingerCount: fingerCount
     });
     
-    // Visual feedback
-    drawRotationIndicator(gesture.x, gesture.y, gesture.rotation, fingerCount);
 }, {
     preventDefault: true
 });
 
-// 2. VERTICAL PAN - Parameter based on finger count
+// KOMBINIERTER PAN-HANDLER (Ersetzt beide alten Pan-Blöcke)
 finger.track('pan', (gesture, touchHistory) => {
     if (!myClientId) return;
     
-    const fingerCount = getFingerCount(touchHistory);
+    // Sicherstellen, dass wir mindestens 1 haben
+    let fingerCount = getFingerCount(touchHistory);
+    if (fingerCount < 1) fingerCount = 1; 
+    
     currentFingerCount = fingerCount;
     
-    // Only trigger on significant movement
-    if (gesture.distance < 15) return;
-    
-    // Detect if movement is primarily vertical
-    const isVertical = Math.abs(gesture.angle) > 45 && Math.abs(gesture.angle) < 135;
-    
-    if (isVertical) {
-        const parameter = fingerCountMap[fingerCount] || 'volume';
-        
-        console.log(`↕️ Vertical: ${gesture.direction} | ${parameter} (${fingerCount} fingers)`);
-        
-        // Up = increase, Down = decrease
-        const change = gesture.direction === 'up' ? 0.05 : -0.05;
-        
-        sendGestureEvent({
-            action: "GESTURE_VERTICAL",
-            change: change,
-            distance: gesture.distance,
-            direction: gesture.direction,
-            fingerCount: fingerCount
-        });
-        
-        drawVerticalIndicator(gesture.x, gesture.y, gesture.direction, fingerCount, parameter);
-    }
-}, {
-    preventDefault: 'vertical'
-});
+    if (gesture.distance < 10) return; // Empfindlichkeit etwas erhöht (von 15 auf 10)
 
-// 3. HORIZONTAL PAN - Parameter based on finger count
-finger.track('pan', (gesture, touchHistory) => {
-    if (!myClientId) return;
+    // Herausfinden, ob die Bewegung MEHR vertikal oder MEHR horizontal ist
+    const absAngle = Math.abs(gesture.angle);
+    const isVertical = absAngle > 45 && absAngle < 135;
     
-    const fingerCount = getFingerCount(touchHistory);
-    currentFingerCount = fingerCount;
+    const parameter = fingerCountMap[fingerCount] || 'volume';
+    let actionType = isVertical ? "GESTURE_VERTICAL" : "GESTURE_HORIZONTAL";
     
-    if (gesture.distance < 15) return;
-    
-    // Detect if movement is primarily horizontal
-    const isHorizontal = Math.abs(gesture.angle) < 45 || Math.abs(gesture.angle) > 135;
-    
-    if (isHorizontal) {
-        const parameter = fingerCountMap[fingerCount] || 'volume';
-        
-        console.log(`↔️ Horizontal: ${gesture.direction} | ${parameter} (${fingerCount} fingers)`);
-        
-        // Right = increase, Left = decrease
-        const change = gesture.direction === 'right' ? 0.05 : -0.05;
-        
-        sendGestureEvent({
-            action: "GESTURE_HORIZONTAL",
-            change: change,
-            distance: gesture.distance,
-            direction: gesture.direction,
-            fingerCount: fingerCount
-        });
-        
+    // Wert-Berechnung (Up/Right = positiv, Down/Left = negativ)
+    let change = 0;
+    if (isVertical) {
+        change = gesture.direction === 'up' ? 0.05 : -0.05;
+    } else {
+        change = gesture.direction === 'right' ? 0.05 : -0.05;
+    }
+
+    console.log(`Sending: ${actionType} | Param: ${parameter} | Fingers: ${fingerCount}`);
+
+    sendGestureEvent({
+        action: actionType,
+        change: change,
+        distance: gesture.distance,
+        direction: gesture.direction,
+        fingerCount: fingerCount
+    });
+
+    // Visuelles Feedback (optional, falls du die Funktionen aus dem Vorpost nutzt)
+    if (isVertical) {
+        drawVerticalIndicator(gesture.x, gesture.y, gesture.direction, fingerCount, parameter);
+    } else {
         drawHorizontalIndicator(gesture.x, gesture.y, gesture.direction, fingerCount, parameter);
     }
 }, {
-    preventDefault: 'horizontal'
+    preventDefault: true // Blockiert das Scrollen der Seite bei 1 Finger
 });
 
 // ============================================
@@ -360,32 +336,39 @@ function render() {
 }
 
 function drawClusteringGroups() {
-    // Draw circles around detected groups
-    detectedGroups.forEach((group, index) => {
+    detectedGroups.forEach((group) => {
         const { centroid, touchCount } = group;
         
-        // Draw group circle
+        // Parameter-Name aus dem Mapping holen
+        const paramName = fingerCountMap[touchCount] ? fingerCountMap[touchCount].toUpperCase() : "VOCALS / FX";
+        
+        // Radius berechnen (wird größer bei mehr Fingern)
         const radius = 80 + (touchCount * 15);
         
+        // 1. Den Kreis zeichnen
         ctx.beginPath();
         ctx.arc(centroid.x, centroid.y, radius, 0, 2 * Math.PI);
         ctx.strokeStyle = `rgba(255, 255, 0, 0.6)`;
         ctx.lineWidth = 3;
-        ctx.setLineDash([10, 5]);
+        ctx.setLineDash([10, 5]); // Gestrichelter Rand
         ctx.stroke();
-        ctx.setLineDash([]);
+        ctx.setLineDash([]); // Reset für andere Zeichnungen
         
-        // Draw group label
-        ctx.fillStyle = "rgba(255, 255, 0, 0.8)";
-        ctx.font = "bold 16px Arial";
+        // 2. Das Label (z.B. "SPEED")
+        ctx.fillStyle = "rgba(255, 255, 0, 0.9)";
+        ctx.font = "bold 20px Arial";
         ctx.textAlign = "center";
-        ctx.fillText(`GROUP ${touchCount}`, centroid.x, centroid.y - radius - 10);
         
-        // Draw centroid
+        ctx.fillText(`${paramName}`, centroid.x, centroid.y - radius - 15);
+        
+        // 3. Den Mittelpunkt (Centroid) markieren
         ctx.beginPath();
-        ctx.arc(centroid.x, centroid.y, 5, 0, 2 * Math.PI);
+        ctx.arc(centroid.x, centroid.y, 8, 0, 2 * Math.PI);
         ctx.fillStyle = "yellow";
         ctx.fill();
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 2;
+        ctx.stroke();
     });
 }
 
@@ -486,118 +469,6 @@ function showColorIndicator() {
     setTimeout(() => {
         render();
     }, 2000);
-}
-
-function drawRotationIndicator(x, y, angle, fingerCount) {
-    // Draw rotation arc
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(angle * Math.PI / 180);
-    
-    // Arrow
-    ctx.beginPath();
-    ctx.moveTo(0, -50);
-    ctx.lineTo(15, -35);
-    ctx.moveTo(0, -50);
-    ctx.lineTo(-15, -35);
-    ctx.strokeStyle = "#32CD32";
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    
-    // Circle
-    ctx.beginPath();
-    ctx.arc(0, 0, 50, 0, 2 * Math.PI);
-    ctx.strokeStyle = "#32CD32";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    
-    ctx.restore();
-    
-    // Info text
-    ctx.fillStyle = "#32CD32";
-    ctx.font = "bold 16px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(`VOCALS`, x, y + 70);
-    ctx.font = "bold 14px Arial";
-    ctx.fillText(`${angle.toFixed(0)}°`, x, y + 90);
-}
-
-function drawVerticalIndicator(x, y, direction, fingerCount, parameter) {
-    // Draw vertical arrow
-    ctx.save();
-    
-    const arrowY = direction === 'up' ? -60 : 60;
-    
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x, y + arrowY);
-    ctx.strokeStyle = "cyan";
-    ctx.lineWidth = 5;
-    ctx.stroke();
-    
-    // Arrow head
-    ctx.beginPath();
-    if (direction === 'up') {
-        ctx.moveTo(x, y + arrowY);
-        ctx.lineTo(x - 12, y + arrowY + 18);
-        ctx.moveTo(x, y + arrowY);
-        ctx.lineTo(x + 12, y + arrowY + 18);
-    } else {
-        ctx.moveTo(x, y + arrowY);
-        ctx.lineTo(x - 12, y + arrowY - 18);
-        ctx.moveTo(x, y + arrowY);
-        ctx.lineTo(x + 12, y + arrowY - 18);
-    }
-    ctx.stroke();
-    
-    ctx.restore();
-    
-    // Info text
-    ctx.fillStyle = "cyan";
-    ctx.font = "bold 16px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(`${fingerCount}F → ${parameter.toUpperCase()}`, x, y + arrowY + (direction === 'up' ? -30 : 50));
-    ctx.font = "bold 14px Arial";
-    ctx.fillText(direction === 'up' ? '↑ UP' : '↓ DOWN', x, y + arrowY + (direction === 'up' ? -10 : 70));
-}
-
-function drawHorizontalIndicator(x, y, direction, fingerCount, parameter) {
-    // Draw horizontal arrow
-    ctx.save();
-    
-    const arrowX = direction === 'right' ? 60 : -60;
-    
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + arrowX, y);
-    ctx.strokeStyle = "magenta";
-    ctx.lineWidth = 5;
-    ctx.stroke();
-    
-    // Arrow head
-    ctx.beginPath();
-    if (direction === 'right') {
-        ctx.moveTo(x + arrowX, y);
-        ctx.lineTo(x + arrowX - 18, y - 12);
-        ctx.moveTo(x + arrowX, y);
-        ctx.lineTo(x + arrowX - 18, y + 12);
-    } else {
-        ctx.moveTo(x + arrowX, y);
-        ctx.lineTo(x + arrowX + 18, y - 12);
-        ctx.moveTo(x + arrowX, y);
-        ctx.lineTo(x + arrowX + 18, y + 12);
-    }
-    ctx.stroke();
-    
-    ctx.restore();
-    
-    // Info text
-    ctx.fillStyle = "magenta";
-    ctx.font = "bold 16px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(`${fingerCount}F → ${parameter.toUpperCase()}`, x + arrowX, y - 30);
-    ctx.font = "bold 14px Arial";
-    ctx.fillText(direction === 'right' ? '→ RIGHT' : '← LEFT', x + arrowX, y - 10);
 }
 
 // ============================================
