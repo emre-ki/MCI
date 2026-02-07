@@ -28,10 +28,10 @@
     [+] Low-Cut
     [+] Hi-Cut
     [+] Low-Boost
-    [ ] Hi-Boost
-    [ ] Gate
-    [ ] Bitcrush
-    [ ] Flanger/Chorus
+    [+] Hi-Boost
+    [+] Gate
+    [+] Bitcrush
+    [+] Flanger/Chorus
 
 
 add [channel] [effekt] [param y] -> gibt ID?

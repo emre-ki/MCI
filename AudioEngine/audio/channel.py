@@ -100,29 +100,21 @@ class AudioChannel:
         if fx_wrapper is None:
             return
 
-       #if self.last_amp:
-       #    self.last_amp.value = 0
-
         new_amp = SigTo(1, time=0.5, init=1)
         
-        # WICHTIG: Wir greifen auf fx_wrapper.node zu für das Audio-Routing
-        #new_amp.mul = self.player
-        #fx_wrapper.node.mul = new_amp
-        fx_wrapper.mix_node.setMul(new_amp)
-        #fx_wrapper.node.setMul(self.output_mix)
+        # Wrapper out node fuer Routing
+        fx_wrapper.out_node.setMul(new_amp)
         
-        # Speichern: Wir merken uns den Wrapper UND den Amp
+        # Wrapper und Amp in Liste einfuegen
         self.effects.append({
-            'wrapper': fx_wrapper,  # <-- Hier liegt unsere Steuerung
+            'wrapper': fx_wrapper,
             'amp': new_amp
         })
         
-        self.last_input = fx_wrapper.mix_node
+        self.last_input = fx_wrapper.out_node
         self.last_amp = new_amp
 
         self.output.setInput(self.last_input)
-        #self.output = Switch(self.last_input, outs=1)
-        #self.output.out()
 
     def effect_rm(self, id):
         # evtll suche nach ID in Zukunft statt nur Index
@@ -144,18 +136,18 @@ class AudioChannel:
         # 2. letzter effekt in chain (-> nur vorheriges element zum output chainen)
         elif id == (fx_size - 1):
             prev_node = self.effects[id - 1]
-            self.last_input = prev_node["wrapper"].mix_node
+            self.last_input = prev_node["wrapper"].out_node
             self.last_amp = prev_node["amp"]
             self.output.setInput(self.last_input)
         # 3. erster effekt in chain (-> rohen input in naechstes element chainen)
         elif id == 0:
             next_node = self.effects[id + 1]
-            next_node["wrapper"].fx_node.setInput(self.player)
+            next_node["wrapper"].in_node.setInput(self.player)
         # sonst mittendrin
         else:
-            prev_mixer = self.effects[id - 1]["wrapper"].mix_node
+            prev_mixer = self.effects[id - 1]["wrapper"].out_node
             next_node = self.effects[id + 1]
-            next_node["wrapper"].fx_node.setInput(prev_mixer)
+            next_node["wrapper"].in_node.setInput(prev_mixer)
 
         effect_node["wrapper"].stop()
         self.effects.pop(id)

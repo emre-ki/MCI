@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 from config import BASE_PATH 
 from config import SONG_PATH
 from audio.engine import AudioEngine
@@ -23,8 +24,9 @@ def main():
 
         if cmd_split[0] == "load":
             if len(cmd_split) > 2:
+                parent_path = Path(__file__).parent
                 SONG_PATH = f"{cmd_split[1]}-{cmd_split[2]}"
-            [channels[i].load(f"{BASE_PATH}/{SONG_PATH}") for i in range(4)]
+                [channels[i].load(f"{parent_path}/{BASE_PATH}/{SONG_PATH}") for i in range(4)]
 
         elif cmd_split[0] == "play":
             pass

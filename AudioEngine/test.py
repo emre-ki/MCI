@@ -79,7 +79,18 @@ sf_instr =  SfPlayer(f"{base_pfad}/{song_pfad}/Instruments.mp3")#.out()
 sf_vocals = SfPlayer(f"{base_pfad}/{song_pfad}/Vocals.mp3")
 
 #d = Delay(sf_vocals, delay=1.5, feedback=.8).out()
-d = ButHP(sf_vocals, freq=5000).out()
+#d = Chorus(sf_vocals, depth=[2.25,2.5], feedback=[.425, .5]).out()
 #e = Harmonizer(d, transpo=-5, winsize=0.05).out()
+
+sound_in = Switch(input=sf_instr, outs=1)
+
+gate = LFO(freq=20, type=2, sharp=1, mul=0.5, add=0.5)
+staerke = SigTo(0.5, time=0.05, init=0.5)
+mod = Sig(1) - (gate * staerke)
+mix = (sound_in * mod)
+print((sound_in * mod))
+
+output = Switch(input=mix, outs=1)
+output.out()
 
 s.gui(locals())
