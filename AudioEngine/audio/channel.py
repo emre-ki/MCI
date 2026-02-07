@@ -27,7 +27,6 @@ class AudioChannel:
         self.amp = SigTo(1, time=0.05)
         self.effects = []
         self.player.setMul(self.amp)
-        self.player.out()
 
         self.output = Switch(input=self.player, outs=1)
         self.output.out()
@@ -48,6 +47,7 @@ class AudioChannel:
         if duration > 0:
             self.phasor.setFreq(self.speed_val.value / duration)
             self.phasor.reset() # An Anfang spulen
+            self.phasor.setPhase(0.0)
 
     def toggle_mute(self):
         self.muted = not self.muted
