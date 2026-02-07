@@ -22,8 +22,8 @@ except ImportError as e:
     print("💡 Make sure the script runs in the correct directory!")
     sys.exit(1)
 
-# Default paths - adjust these
-BASE_PATH = os.path.expanduser("musik_files")  # Change this
+# Default paths
+BASE_PATH = os.path.expanduser("musik_files")  
 DEFAULT_SONG = "KanyeWest-FlashingLights"
 
 

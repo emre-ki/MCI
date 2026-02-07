@@ -118,26 +118,47 @@ socket.onmessage = (event) => {
 // ============================================
 // Touch Clustering & Group Detection
 // ============================================
-
+let trackGroupId = null;
 function updateClustering() {
     detectedGroups = clustering.findGroups(myTouches);
     
-    // Analyze groups
     if (detectedGroups.length === 0) {
         selectedTrack = null;
+        trackGroupId = null; // Reset, wenn alles losgelassen wird
         return;
     }
-    
-    // Sort groups by touch count
-    detectedGroups.sort((a, b) => a.touchCount - b.touchCount);
-    
-    // First group (smallest) = Track selection (1-4 touches)
-    const trackGroup = detectedGroups[0];
-    if (trackGroup.touchCount >= 1 && trackGroup.touchCount <= 4) {
-        selectedTrack = trackGroup.touchCount - 1;  // 1 touch = track 0, etc.
+
+    let trackGroup = null;
+    let effectGroup = null;
+
+    if (detectedGroups.length === 1) {
+        // Nur eine Hand: Diese ist immer die Track-Gruppe
+        trackGroup = detectedGroups[0];
+        trackGroupId = trackGroup.id; 
+    } else {
+        // Zwei Hände: Wir suchen die Gruppe, die wir schon als Track-Gruppe kennen
+        trackGroup = detectedGroups.find(g => g.id === trackGroupId);
+        
+        // Falls die alte Gruppe weg ist oder wir neu zuweisen müssen:
+        // Die Gruppe mit der kleineren ID (meistens die ältere) nehmen
+        if (!trackGroup) {
+            detectedGroups.sort((a, b) => a.id.localeCompare(b.id));
+            trackGroup = detectedGroups[0];
+            trackGroupId = trackGroup.id;
+        }
+        
+        // Die ANDERE Gruppe ist dann automatisch das Effekt-Board
+        effectGroup = detectedGroups.find(g => g.id !== trackGroupId);
     }
-    
-    console.log(`🎯 Groups: ${detectedGroups.length} | Track: ${selectedTrack !== null ? trackNames[selectedTrack] : 'none'}`);
+
+    // SPUR SETZEN (Nur wenn die trackGroup 1-4 Finger hat)
+    if (trackGroup && trackGroup.touchCount <= 4) {
+        selectedTrack = trackGroup.touchCount - 1; 
+    }
+
+    // EFFEKT STEUERN
+    // Wichtig: Wir übergeben der Gesten-Logik jetzt explizit die Koordinaten 
+    // der effectGroup, falls diese existiert.
 }
 
 // ============================================
@@ -572,9 +593,6 @@ function sendCommand(command) {
     }
 }
 
-// ============================================
-// Resize Handler
-// ============================================
 
 window.addEventListener('resize', () => {
     canv.width = window.innerWidth;
@@ -582,7 +600,6 @@ window.addEventListener('resize', () => {
     render();
 });
 
-// Initial render
 setTimeout(render, 100);
 
 console.log(`

@@ -32,18 +32,16 @@ export class TouchClustering {
             };
         });
 
-        // Wenn weniger als 2 Punkte, keine Gruppen möglich
-        if (touchArray.length < 2) {
+        // Wenn weniger als 1 Punkte, keine Gruppen möglich
+        if (touchArray.length < 1) {
             this.groups.clear();
             return [];
         }
 
         // Finde neue Gruppen mittels Distanz-basiertem Clustering
         const newGroups = this.clusterByDistance(touchArray);
-        
         // Update bestehende Gruppen oder erstelle neue
         this.updateGroups(newGroups);
-        
         // Gib nur stabile Gruppen zurück
         return this.getStableGroups();
     }
@@ -88,14 +86,14 @@ export class TouchClustering {
             }
 
             // Nur Cluster mit mindestens 2 Punkten sind interessant
-            if (cluster.length >= 2) {
-                clusters.push({
-                    touches: cluster,
-                    centroid: this.calculateCentroid(cluster),
-                    touchCount: cluster.length,
-                    timestamp: Date.now()
-                });
-            }
+           
+            clusters.push({
+                touches: cluster,
+                centroid: this.calculateCentroid(cluster),
+                touchCount: cluster.length,
+                timestamp: Date.now()
+            });
+            
         }
 
         return clusters;

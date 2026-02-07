@@ -1,58 +1,34 @@
-body, html { 
-    margin: 0; 
-    padding: 0; 
-    overflow: hidden;
-    font-family: 'Arial', sans-serif;
-    background: #1a1a1a;
-    touch-action: none;
-    -webkit-user-select: none;
-    user-select: none;
-    overscroll-behavior: none;
-}
+* {
+ margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+            background: #1a1a1a;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+            overscroll-behavior: none;
+        }
 
-canvas { 
-    background: #1a1a1a; 
-    display: block;
-    position: absolute;
-    top: 0;
-    left: 0;
-    touch-action: none; 
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none; 
-}
+        #canv { 
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            touch-action: none; 
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none; 
+        }
 
-/* Gesture Info Overlay */
-#gesture-info {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    background: rgba(0, 0, 0, 0.9);
-    color: white;
-    padding: 20px;
-    border-radius: 15px;
-    border: 2px solid #4CAF50;
-    min-width: 250px;
-    z-index: 1000;
-    pointer-events: none;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-}
-
-#gesture-info h3 {
-    margin: 0 0 15px 0;
-    font-size: 18px;
-    color: #4CAF50;
-    border-bottom: 2px solid #4CAF50;
-    padding-bottom: 10px;
-}
-
-#active-gestures {
-    font-size: 14px;
-    line-height: 1.6;
-    font-family: 'Courier New', monospace;
-}
-
-#landing {
+        #landing {
             position: fixed;
             top: 0;
             left: 0;
@@ -106,54 +82,3 @@ canvas {
         #startButton:active {
             transform: scale(0.98);
         }
-
-#active-gestures div {
-    padding: 5px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-#active-gestures div:last-child {
-    border-bottom: none;
-}
-
-/* Gesture Icons */
-.gesture-icon {
-    display: inline-block;
-    width: 20px;
-    text-align: center;
-    margin-right: 5px;
-}
-
-/* Animation for active gestures */
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
-.active-gesture {
-    animation: pulse 1s infinite;
-    color: #4CAF50;
-    font-weight: bold;
-}
-
-/* Mobile optimizations */
-@media (max-width: 768px) {
-    #gesture-info {
-        top: 10px;
-        right: 10px;
-        padding: 15px;
-        min-width: 200px;
-        font-size: 12px;
-    }
-    
-    #gesture-info h3 {
-        font-size: 14px;
-    }
-}
-
-/* Hide on very small screens */
-@media (max-width: 480px) {
-    #gesture-info {
-        display: none;
-    }
-}
