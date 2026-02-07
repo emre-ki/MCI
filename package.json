@@ -1,20 +1,25 @@
 {
-  "name": "mci",
+  "name": "tui-multi-touch-audio",
   "version": "1.0.0",
-  "description": "",
-  "main": "script.js",
+  "description": "Multi-touch gestural audio controller with isolated canvases",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
-  "keywords": [],
+  "keywords": [
+    "audio",
+    "multi-touch",
+    "gestures",
+    "websocket"
+  ],
   "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "license": "MIT",
   "dependencies": {
-    "express": "^5.2.1",
-    "socket.io": "^4.8.1",
-    "the-finger": "^1.0.3",
-    "tone": "^15.1.22",
-    "ws": "^8.18.3"
+    "express": "^4.22.1",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   }
 }

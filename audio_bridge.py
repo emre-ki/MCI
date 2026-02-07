@@ -1,31 +1,37 @@
 #!/usr/bin/env python3
 """
 Audio WebSocket Bridge
-Verbindet Node.js Server (Port 3000) mit Python Audio Engine
-Läuft auf: ws://localhost:5001
+Connects Node.js Server (Port 3000) with Python Audio Engine
+Runs on: ws://localhost:5001
 """
 
 import asyncio
 import websockets
 import json
 import sys
+import os
 
-# Importiere DEINE bestehenden Classes (NICHT ändern!)
+# Import your existing classes
 try:
+    # Adjust imports based on your project structure
     from AudioEngine.audio.engine import AudioEngine
     from AudioEngine.audio.channel import AudioChannel
     from AudioEngine.config import BASE_PATH, SONG_PATH
 except ImportError as e:
     print(f"❌ Import Error: {e}")
-    print("💡 Stelle sicher dass der Script im richtigen Verzeichnis läuft!")
+    print("💡 Make sure the script runs in the correct directory!")
     sys.exit(1)
+
+# Default paths - adjust these
+BASE_PATH = os.path.expanduser("musik_files")  # Change this
+DEFAULT_SONG = "KanyeWest-FlashingLights"
 
 
 class AudioBridge:
     def __init__(self):
-        print("🎵 Initialisiere Audio Engine...")
+        print("🎵 Initializing Audio Engine...")
         
-        # Deine Audio Engine (unverändert!)
+        # Your Audio Engine
         self.engine = AudioEngine()
         self.engine.start()
         
@@ -35,36 +41,49 @@ class AudioBridge:
         
         self.clients = set()
         self.current_song = None
+        self.is_playing = False
         
-        print("✅ Audio Engine bereit!")
+        print("✅ Audio Engine ready!")
     
-    # ========== SONG LOADING ==========
+    # ========== SONG LOADING & PLAYBACK ==========
     
     def load_song(self, song_path):
-        """Lädt Song in alle Channels"""
-        print(f"📀 Lade: {song_path}")
+        """Loads song into all channels and starts playback"""
+        print(f"📀 Loading: {song_path}")
+        
+        full_path = f"{BASE_PATH}/{song_path}"
         
         try:
-            for channel in self.channels:
-                channel.load(f"{BASE_PATH}/{song_path}")
+            for i, channel in enumerate(self.channels):
+                track_path = f"{full_path}/{self.channel_names[i]}.mp3"
+                
+                if not os.path.exists(track_path):
+                    print(f"⚠️  Warning: {track_path} not found")
+                    continue
+                
+                channel.load(full_path)
+                print(f"  ✓ Loaded {self.channel_names[i]}")
             
             self.current_song = song_path
-            print(f"✅ Geladen: {song_path}")
+            self.is_playing = True
+            
+            print(f"✅ Playback started: {song_path}")
             return True
+            
         except Exception as e:
-            print(f"❌ Fehler: {e}")
+            print(f"❌ Error loading song: {e}")
             return False
     
     # ========== PARAMETER CONTROLS ==========
     
     def set_volume(self, channel_id, volume):
-        """Volume setzen (0.0 - 1.0)"""
+        """Set volume (0.0 - 1.0)"""
         if 0 <= channel_id < 4:
             self.channels[channel_id].set_vol(volume)
             print(f"🔊 {self.channel_names[channel_id]} Vol: {volume:.2f}")
     
     def set_speed(self, speed):
-        """Speed setzen (0.5 - 2.0)"""
+        """Set speed (0.5 - 2.0)"""
         for channel in self.channels:
             channel.set_speed(speed)
         print(f"⚡ Speed: {speed:.2f}x")
@@ -84,7 +103,7 @@ class AudioBridge:
     # ========== EFFECTS ==========
     
     def add_effect(self, channel_id, effect_type, y_value):
-        """Effekt hinzufügen
+        """Add effect
         
         effect_type: 'lowcut', 'hicut', 'lowboost', 'hiboost', 'reverb', 'delay'
         y_value: Initial Y (0.0 - 1.0)
@@ -102,7 +121,7 @@ class AudioBridge:
         return -1
     
     def remove_effect(self, channel_id, effect_id):
-        """Effekt entfernen"""
+        """Remove effect"""
         if 0 <= channel_id < 4:
             try:
                 self.channels[channel_id].effect_rm(effect_id)
@@ -111,9 +130,9 @@ class AudioBridge:
                 print(f"❌ Effect Remove Error: {e}")
     
     def set_effect_param(self, channel_id, effect_id, param, value):
-        """Effekt Parameter setzen
+        """Set effect parameter
         
-        param: 'x' oder 'y'
+        param: 'x' or 'y'
         value: 0.0 - 1.0
         """
         if 0 <= channel_id < 4:
@@ -126,20 +145,21 @@ class AudioBridge:
     # ========== WEBSOCKET HANDLER ==========
     
     async def handle_client(self, websocket):
-        """Behandelt WebSocket Clients (Node.js Server)"""
+        """Handle WebSocket Clients (Node.js Server)"""
         addr = websocket.remote_address
         print(f"✅ Client connected: {addr}")
         self.clients.add(websocket)
         
         try:
-            # Initial State senden
+            # Initial State
             await websocket.send(json.dumps({
                 "action": "INIT",
                 "channels": self.channel_names,
-                "current_song": self.current_song
+                "current_song": self.current_song,
+                "is_playing": self.is_playing
             }))
             
-            # Messages empfangen
+            # Receive messages
             async for message in websocket:
                 try:
                     data = json.loads(message)
@@ -153,12 +173,12 @@ class AudioBridge:
             self.clients.remove(websocket)
     
     async def process_message(self, data):
-        """Verarbeitet Commands von Node.js"""
+        """Process Commands from Node.js"""
         
         action = data.get("action")
         
         if action == "LOAD_SONG":
-            song_path = data.get("song_path")
+            song_path = data.get("song_path", DEFAULT_SONG)
             self.load_song(song_path)
         
         elif action == "SET_VOLUME":
@@ -214,7 +234,7 @@ class AudioBridge:
                 self.set_effect_param(channel, effect_id, param, value)
     
     async def broadcast(self, message):
-        """Broadcast an alle Clients"""
+        """Broadcast to all clients"""
         if self.clients:
             msg_str = json.dumps(message)
             disconnected = set()
@@ -228,7 +248,7 @@ class AudioBridge:
             self.clients -= disconnected
     
     async def start_server(self, host="localhost", port=5001):
-        """Startet WebSocket Server"""
+        """Start WebSocket Server"""
         print(f"""
 ╔════════════════════════════════════════╗
 ║  Audio WebSocket Bridge                ║
@@ -246,6 +266,12 @@ class AudioBridge:
 ║                                        ║
 ║  Parameters: x, y (0.0 - 1.0)          ║
 ╚════════════════════════════════════════╝
+
+⚠️  IMPORTANT: Place your audio files at:
+   {BASE_PATH}/KanyeWest-FlashingLights/Bass.mp3
+   {BASE_PATH}/KanyeWest-FlashingLights/Drums.mp3
+   {BASE_PATH}/KanyeWest-FlashingLights/Instruments.mp3
+   {BASE_PATH}/KanyeWest-FlashingLights/Vocals.mp3
         """)
         
         async with websockets.serve(self.handle_client, host, port):

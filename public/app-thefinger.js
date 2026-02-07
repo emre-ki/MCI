@@ -1,70 +1,95 @@
 import { TouchClustering } from './clustering.js';
 
+// WebSocket connection
 const socket = new WebSocket('ws://' + window.location.host);
-let touchColor = "black";
 let myClientId = null;
-let myChannel = 0;
-let myChannelName = "";
-let connectedClients = 0;
+let touchColor = "white";
+let sessionStarted = false;
 
-// Canvas Setup
+// Canvas setup
 const canv = document.getElementById("canv");
 canv.width = window.innerWidth;
 canv.height = window.innerHeight;
 const ctx = canv.getContext("2d");
 
-// Touch Tracking
-const activeTouches = new Map();
+// Landing page
+const landing = document.getElementById("landing");
+const startButton = document.getElementById("startButton");
+
+// Touch tracking (ONLY MY TOUCHES)
 const myTouches = new Map();
 
 // Touch Clustering
 const clustering = new TouchClustering();
-clustering.setMaxDistance(250);
-clustering.setStabilityThreshold(50);
+clustering.setMaxDistance(200);
+clustering.setStabilityThreshold(80);
 
-// Audio State (synchronized from server)
+// Audio state
 let audioState = {
     volume: [1.0, 1.0, 1.0, 1.0],
     speed: 1.0,
-    effects: [[], [], [], []]
+    effects: [[], [], [], []],
+    playing: false
 };
 
-// Channel names
-const channelNames = ["Bass", "Drums", "Instruments", "Vocals"];
-const channelColors = ["#8B4513", "#FF6347", "#4169E1", "#32CD32"];
+// Track names
+const trackNames = ["Bass", "Drums", "Instruments", "Vocals"];
+const trackColors = ["#8B4513", "#FF6347", "#4169E1", "#32CD32"];
 
-// Finger Count -> Action Mapping
-const fingerCountMap = {
-    1: 'volume',
-    2: 'speed',
-    3: 'effect_x',
-    4: 'effect_y',
-    5: 'add/remove_effect'
-};
-
-// Active gesture tracking
-let currentFingerCount = 0;
+// Current state
+let selectedTrack = null;  // Which track is selected (0-3)
 let detectedGroups = [];
 
-// ============================================
-// The Finger Setup
-// ============================================
-
+// The Finger setup
 const finger = new TheFinger(canv, {
     preventDefault: true,
-    visualize: false 
+    visualize: false
+});
+
+// ============================================
+// Landing Page - Start Button
+// ============================================
+// Hilfsfunktion zum Senden von Befehlen (falls noch nicht vorhanden)
+function sendCommandWeb(data) {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(data));
+    } else {
+        console.warn("⚠️ WebSocket nicht bereit.");
+    }
+}
+
+// Event Listener für den Start-Button
+startButton.addEventListener('click', () => {
+    console.log("🎬 Session startet...");
+
+    // 1. Landing Page visuell ausblenden (nutzt deine CSS transition)
+    landing.classList.add('hidden');
+    
+    // 2. Interaktionen freischalten
+    sessionStarted = true;
+
+    // 3. Musik-Start-Befehl an Node.js senden
+    // WICHTIG: "song" muss dem Ordnernamen in deinem musik_files Ordner entsprechen!
+    sendCommandWeb({
+        action: "START_PLAYBACK",
+        song: "KanyeWest-FlashingLights" 
+    });
+
+    setTimeout(() => {
+        landing.style.display = 'none';
+    }, 500);
 });
 
 // ============================================
 // WebSocket Handlers
 // ============================================
 
-socket.onopen = (event) => {
-    console.log("✓ WebSocket verbunden!");
+socket.onopen = () => {
+    console.log("✓ WebSocket connected");
 };
 
 socket.onerror = (error) => {
-    console.error("✗ WebSocket Fehler:", error);
+    console.error("✗ WebSocket error:", error);
 };
 
 socket.onmessage = (event) => {
@@ -72,159 +97,208 @@ socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
         
         if (data.action === "SET_COLOR") {
-            touchColor = data.color;
             myClientId = data.clientId;
-            myChannel = data.channel;
-            myChannelName = data.channelName;
-            console.log(`✓ Farbe: ${touchColor} | Channel: ${myChannel} (${myChannelName})`);
-            showChannelAssignment();
-        }
-        else if (data.action === "TOUCH_START" || data.action === "TOUCH_MOVE") {
-            const key = `${data.clientId}-${data.touchId}`;
-            activeTouches.set(key, {
-                x: data.x,
-                y: data.y,
-                color: data.color,
-                clientId: data.clientId
-            });
-            
-            if (data.clientId === myClientId) {
-                myTouches.set(key, {
-                    x: data.x,
-                    y: data.y,
-                    color: data.color
-                });
-            }
-            
-            updateClustering();
-            render();
-        } 
-        else if (data.action === "TOUCH_END") {
-            const key = `${data.clientId}-${data.touchId}`;
-            activeTouches.delete(key);
-            
-            if (data.clientId === myClientId) {
-                myTouches.delete(key);
-            }
-            
-            updateClustering();
-            render();
+            touchColor = data.color;
+            console.log(`✓ Client ID: ${myClientId}, Color: ${touchColor}`);
         }
         else if (data.action === "AUDIO_STATE_UPDATE") {
-            console.log(`🎵 Audio State Update`);
             audioState = data.state;
             render();
         }
-        else if (data.action === "CLIENT_COUNT_UPDATE") {
-            connectedClients = data.count;
-            console.log(`👥 Clients: ${connectedClients}`);
+        else if (data.action === "PLAYBACK_STARTED") {
+            audioState.playing = true;
+            console.log("🎵 Playback started");
             render();
         }
     } catch (error) {
-        console.error("❌ Parse Error:", error);
+        console.error("❌ Parse error:", error);
     }
 };
 
-// Update clustering
+// ============================================
+// Touch Clustering & Group Detection
+// ============================================
+
 function updateClustering() {
-    detectedGroups = clustering.findGroups(activeTouches);
+    detectedGroups = clustering.findGroups(myTouches);
+    
+    // Analyze groups
+    if (detectedGroups.length === 0) {
+        selectedTrack = null;
+        return;
+    }
+    
+    // Sort groups by touch count
+    detectedGroups.sort((a, b) => a.touchCount - b.touchCount);
+    
+    // First group (smallest) = Track selection (1-4 touches)
+    const trackGroup = detectedGroups[0];
+    if (trackGroup.touchCount >= 1 && trackGroup.touchCount <= 4) {
+        selectedTrack = trackGroup.touchCount - 1;  // 1 touch = track 0, etc.
+    }
+    
+    console.log(`🎯 Groups: ${detectedGroups.length} | Track: ${selectedTrack !== null ? trackNames[selectedTrack] : 'none'}`);
 }
 
 // ============================================
 // The Finger Gesture Handlers
 // ============================================
 
-function getFingerCount(touchHistory) {
-    for (const group of detectedGroups) {
-        const hasMyTouch = group.touches.some(t => t.clientId === myClientId);
-        if (hasMyTouch) {
-            return group.touchCount;
-        }
-    }
-    return touchHistory.size;
+// Helper: Get the effect control group (second group with more touches)
+function getEffectControlGroup() {
+    if (detectedGroups.length < 2) return null;
+    
+    // Effect control group is the second group (larger one)
+    return detectedGroups[1];
 }
 
-// ROTATION - Controls channel volume
+// ROTATION - Volume control for selected track
 finger.track('rotate', (gesture, touchHistory) => {
-    if (!myClientId) return;
+    if (!myClientId || !sessionStarted || selectedTrack === null) return;
     
-    const fingerCount = getFingerCount(touchHistory);
-    currentFingerCount = fingerCount;
+    const angleChange = gesture.angleRelative / 360;
+    const volumeChange = angleChange * 0.5;
     
-    console.log(`🔄 Rotation: ${gesture.angleRelative.toFixed(1)}° | Fingers: ${fingerCount}`);
+    console.log(`🔄 Rotation on ${trackNames[selectedTrack]}: ${volumeChange.toFixed(3)}`);
     
-    const paramChange = gesture.angleRelative / 360 * 0.5;
-    
-    sendGestureEvent({
-        action: "GESTURE_ROTATE",
-        change: paramChange,
-        angle: gesture.rotation,
-        fingerCount: fingerCount
+    sendCommand({
+        action: "ADJUST_VOLUME",
+        track: selectedTrack,
+        change: volumeChange
     });
     
+    drawGestureIndicator(gesture.x, gesture.y, 'rotate', selectedTrack);
 }, {
     preventDefault: true
 });
 
-// COMBINED PAN HANDLER
+// VERTICAL PAN - Effect Y parameter or volume
 finger.track('pan', (gesture, touchHistory) => {
-    if (!myClientId) return;
+    if (!myClientId || !sessionStarted || selectedTrack === null) return;
+    if (gesture.distance < 15) return;
     
-    let fingerCount = getFingerCount(touchHistory);
-    if (fingerCount < 1) fingerCount = 1;
-    
-    currentFingerCount = fingerCount;
-    
-    if (gesture.distance < 10) return;
-
     const absAngle = Math.abs(gesture.angle);
     const isVertical = absAngle > 45 && absAngle < 135;
     
-    let actionType = isVertical ? "GESTURE_VERTICAL" : "GESTURE_HORIZONTAL";
+    if (!isVertical) return;
     
-    let change = 0;
-    if (isVertical) {
-        change = gesture.direction === 'up' ? 0.05 : -0.05;
+    const change = gesture.direction === 'up' ? 0.05 : -0.05;
+    
+    const effectGroup = getEffectControlGroup();
+    
+    if (effectGroup) {
+        // Has effect control group - adjust effect Y
+        console.log(`↕️ Effect Y on ${trackNames[selectedTrack]}: ${change.toFixed(3)}`);
+        
+        sendCommand({
+            action: "ADJUST_EFFECT",
+            track: selectedTrack,
+            param: 'y',
+            change: change
+        });
     } else {
-        change = gesture.direction === 'right' ? 0.05 : -0.05;
+        // No effect group - adjust volume
+        console.log(`↕️ Volume on ${trackNames[selectedTrack]}: ${change.toFixed(3)}`);
+        
+        sendCommand({
+            action: "ADJUST_VOLUME",
+            track: selectedTrack,
+            change: change
+        });
     }
+    
+    drawGestureIndicator(gesture.x, gesture.y, 'vertical', selectedTrack);
+}, {
+    preventDefault: true
+});
 
-    console.log(`${isVertical ? '↕️' : '↔️'} ${fingerCount}F: ${fingerCountMap[fingerCount] || 'volume'}`);
+// HORIZONTAL PAN - Effect X parameter or speed
+finger.track('pan', (gesture, touchHistory) => {
+    if (!myClientId || !sessionStarted || selectedTrack === null) return;
+    if (gesture.distance < 15) return;
+    
+    const absAngle = Math.abs(gesture.angle);
+    const isHorizontal = absAngle < 45 || absAngle > 135;
+    
+    if (!isHorizontal) return;
+    
+    const change = gesture.direction === 'right' ? 0.05 : -0.05;
+    
+    const effectGroup = getEffectControlGroup();
+    
+    if (effectGroup) {
+        // Has effect control group - adjust effect X
+        console.log(`↔️ Effect X on ${trackNames[selectedTrack]}: ${change.toFixed(3)}`);
+        
+        sendCommand({
+            action: "ADJUST_EFFECT",
+            track: selectedTrack,
+            param: 'x',
+            change: change
+        });
+    } else {
+        // No effect group - adjust speed (global)
+        console.log(`↔️ Speed: ${change.toFixed(3)}`);
+        
+        sendCommand({
+            action: "ADJUST_SPEED",
+            change: change
+        });
+    }
+    
+    drawGestureIndicator(gesture.x, gesture.y, 'horizontal', selectedTrack);
+}, {
+    preventDefault: true
+});
 
-    sendGestureEvent({
-        action: actionType,
-        change: change,
-        distance: gesture.distance,
-        direction: gesture.direction,
-        fingerCount: fingerCount
+// TAP - Add/Remove effects
+finger.track('tap', (gesture, touchHistory) => {
+    if (!myClientId || !sessionStarted || selectedTrack === null) return;
+    
+    const effectGroup = getEffectControlGroup();
+    
+    if (effectGroup) {
+        // Add effect
+        console.log(`➕ Add effect to ${trackNames[selectedTrack]}`);
+        
+        sendCommand({
+            action: "ADD_EFFECT",
+            track: selectedTrack,
+            effectType: 'reverb'  // Cycle through effects on server
+        });
+    }
+}, {
+    preventDefault: true
+});
+
+// LONG PRESS - Remove last effect
+finger.track('long-press', (gesture, touchHistory) => {
+    if (!myClientId || !sessionStarted || selectedTrack === null) return;
+    
+    console.log(`➖ Remove effect from ${trackNames[selectedTrack]}`);
+    
+    sendCommand({
+        action: "REMOVE_EFFECT",
+        track: selectedTrack
     });
-
-    if (isVertical) {
-        drawVerticalIndicator(gesture.x, gesture.y, gesture.direction, fingerCount);
-    } else {
-        drawHorizontalIndicator(gesture.x, gesture.y, gesture.direction, fingerCount);
-    }
 }, {
     preventDefault: true
 });
 
 // ============================================
-// Touch Events
+// Touch Event Handlers (Local only)
 // ============================================
 
 canv.addEventListener("touchstart", function(event) {
     if (!myClientId) return;
     
     for (const touch of event.changedTouches) {
-        const x = touch.clientX;
-        const y = touch.clientY;
-        const touchId = touch.identifier;
-
-        const key = `${myClientId}-${touchId}`;
-        myTouches.set(key, { x, y, color: touchColor });
-        activeTouches.set(key, { x, y, color: touchColor, clientId: myClientId });
-        
-        sendTouchEvent("TOUCH_START", touchId, x, y);
+        const key = `${myClientId}-${touch.identifier}`;
+        myTouches.set(key, {
+            x: touch.clientX,
+            y: touch.clientY,
+            color: touchColor
+        });
     }
     
     updateClustering();
@@ -233,17 +307,14 @@ canv.addEventListener("touchstart", function(event) {
 
 canv.addEventListener("touchmove", function(event) {
     if (!myClientId) return;
-
+    
     for (const touch of event.changedTouches) {
-        const x = touch.clientX;
-        const y = touch.clientY;
-        const touchId = touch.identifier;
-
-        const key = `${myClientId}-${touchId}`;
-        myTouches.set(key, { x, y, color: touchColor });
-        activeTouches.set(key, { x, y, color: touchColor, clientId: myClientId });
-        
-        sendTouchEvent("TOUCH_MOVE", touchId, x, y);
+        const key = `${myClientId}-${touch.identifier}`;
+        myTouches.set(key, {
+            x: touch.clientX,
+            y: touch.clientY,
+            color: touchColor
+        });
     }
     
     updateClustering();
@@ -252,15 +323,10 @@ canv.addEventListener("touchmove", function(event) {
 
 canv.addEventListener("touchend", function(event) {
     if (!myClientId) return;
-
+    
     for (const touch of event.changedTouches) {
-        const touchId = touch.identifier;
-        const key = `${myClientId}-${touchId}`;
-        
+        const key = `${myClientId}-${touch.identifier}`;
         myTouches.delete(key);
-        activeTouches.delete(key);
-        
-        sendTouchEvent("TOUCH_END", touchId, 0, 0);
     }
     
     updateClustering();
@@ -269,15 +335,10 @@ canv.addEventListener("touchend", function(event) {
 
 canv.addEventListener("touchcancel", function(event) {
     if (!myClientId) return;
-
+    
     for (const touch of event.changedTouches) {
-        const touchId = touch.identifier;
-        const key = `${myClientId}-${touchId}`;
-        
+        const key = `${myClientId}-${touch.identifier}`;
         myTouches.delete(key);
-        activeTouches.delete(key);
-        
-        sendTouchEvent("TOUCH_END", touchId, 0, 0);
     }
     
     updateClustering();
@@ -285,28 +346,24 @@ canv.addEventListener("touchcancel", function(event) {
 });
 
 // ============================================
-// Rendering & Visualization
+// Rendering
 // ============================================
 
 function render() {
     ctx.clearRect(0, 0, canv.width, canv.height);
     
-    // 1. Channel Info (top left)
-    drawChannelInfo();
+    if (!sessionStarted) return;
     
-    // 2. Clustering Groups
-    drawClusteringGroups();
+    // 1. Track meters
+    drawTrackMeters();
     
-    // 3. Channel Meters (bottom)
-    drawChannelMeters();
+    // 2. Clustering groups
+    drawGroups();
     
-    // 4. Effects Stack (right)
-    drawEffectsStack();
-    
-    // 5. My Touches
-    myTouches.forEach((touch, key) => {
+    // 3. My touches
+    myTouches.forEach((touch) => {
         ctx.beginPath();
-        ctx.arc(touch.x, touch.y, 25, 0, 2 * Math.PI);
+        ctx.arc(touch.x, touch.y, 30, 0, 2 * Math.PI);
         ctx.fillStyle = touchColor;
         ctx.fill();
         ctx.strokeStyle = "white";
@@ -314,280 +371,210 @@ function render() {
         ctx.stroke();
     });
     
-    // 6. Client count
-    drawClientCount();
+    // 4. Selected track indicator
+    if (selectedTrack !== null) {
+        drawSelectedTrackInfo();
+    }
+    
+    // 5. Effects stack
+    if (selectedTrack !== null) {
+        drawEffectsStack();
+    }
+    
+    // 6. Playback status
+    drawPlaybackStatus();
 }
 
-function drawChannelInfo() {
-    // Large channel indicator
-    const boxWidth = 250;
-    const boxHeight = 100;
-    
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-    ctx.fillRect(20, 20, boxWidth, boxHeight);
-    
-    ctx.strokeStyle = touchColor;
-    ctx.lineWidth = 4;
-    ctx.strokeRect(20, 20, boxWidth, boxHeight);
-    
-    // Channel name
-    ctx.fillStyle = touchColor;
-    ctx.font = 'bold 32px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText(myChannelName, 35, 65);
-    
-    // Channel number
-    ctx.font = '20px Arial';
-    ctx.fillStyle = 'white';
-    ctx.fillText(`Channel ${myChannel}`, 35, 95);
-}
-
-function drawClusteringGroups() {
-    detectedGroups.forEach((group) => {
-        const { centroid, touchCount } = group;
-        
-        const actionName = fingerCountMap[touchCount] || 'volume';
-        const radius = 80 + (touchCount * 15);
-        
-        ctx.beginPath();
-        ctx.arc(centroid.x, centroid.y, radius, 0, 2 * Math.PI);
-        ctx.strokeStyle = `rgba(255, 255, 0, 0.6)`;
-        ctx.lineWidth = 3;
-        ctx.setLineDash([10, 5]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        
-        ctx.fillStyle = "rgba(255, 255, 0, 0.9)";
-        ctx.font = "bold 20px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(`${touchCount}F: ${actionName.toUpperCase()}`, centroid.x, centroid.y - radius - 15);
-        
-        ctx.beginPath();
-        ctx.arc(centroid.x, centroid.y, 8, 0, 2 * Math.PI);
-        ctx.fillStyle = "yellow";
-        ctx.fill();
-        ctx.strokeStyle = "black";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-    });
-}
-
-function drawChannelMeters() {
-    const meterHeight = 120;
+function drawTrackMeters() {
+    const meterHeight = 150;
     const startY = canv.height - meterHeight - 20;
-    const meterWidth = Math.min(80, (canv.width - 100) / 4);
+    const meterWidth = Math.min(90, (canv.width - 100) / 4);
     const spacing = 15;
     
-    // Draw all 4 channels
     for (let i = 0; i < 4; i++) {
         const x = 20 + i * (meterWidth + spacing);
         const volume = audioState.volume[i];
         const fillHeight = volume * meterHeight;
         
-        const isMyChannel = (i === myChannel);
+        const isSelected = (i === selectedTrack);
         
         // Background
-        ctx.fillStyle = '#222';
+        ctx.fillStyle = '#1a1a1a';
         ctx.fillRect(x, startY, meterWidth, meterHeight);
         
         // Fill
-        ctx.fillStyle = channelColors[i];
+        ctx.fillStyle = trackColors[i];
         ctx.fillRect(x, startY + meterHeight - fillHeight, meterWidth, fillHeight);
         
-        // Border - highlight my channel
-        ctx.strokeStyle = isMyChannel ? touchColor : 'white';
-        ctx.lineWidth = isMyChannel ? 5 : 2;
+        // Border
+        ctx.strokeStyle = isSelected ? touchColor : '#555';
+        ctx.lineWidth = isSelected ? 5 : 2;
         ctx.strokeRect(x, startY, meterWidth, meterHeight);
         
-        // Channel name
+        // Label
         ctx.fillStyle = "white";
-        ctx.font = isMyChannel ? "bold 14px Arial" : "12px Arial";
+        ctx.font = isSelected ? "bold 14px Arial" : "12px Arial";
         ctx.textAlign = "center";
-        ctx.fillText(channelNames[i], x + meterWidth / 2, startY - 8);
+        ctx.fillText(trackNames[i], x + meterWidth / 2, startY - 8);
         
-        // Volume value
+        // Volume
         ctx.font = "bold 16px Arial";
-        ctx.fillText(`${(volume * 100).toFixed(0)}%`, x + meterWidth / 2, startY + meterHeight / 2);
+        ctx.fillText(`${(volume * 100).toFixed(0)}%`, x + meterWidth / 2, startY + meterHeight / 2 + 6);
     }
-    
-    // Speed indicator
-    const speedX = 20 + 4 * (meterWidth + spacing);
-    ctx.fillStyle = '#222';
-    ctx.fillRect(speedX, startY, meterWidth, meterHeight);
-    
-    const speedNorm = (audioState.speed - 0.5) / 1.5;
-    const speedFillHeight = speedNorm * meterHeight;
-    
-    ctx.fillStyle = '#FF69B4';
-    ctx.fillRect(speedX, startY + meterHeight - speedFillHeight, meterWidth, speedFillHeight);
-    
-    ctx.strokeStyle = 'white';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(speedX, startY, meterWidth, meterHeight);
-    
-    ctx.fillStyle = "white";
-    ctx.font = "12px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("SPEED", speedX + meterWidth / 2, startY - 8);
-    
-    ctx.font = "bold 14px Arial";
-    ctx.fillText(`${audioState.speed.toFixed(1)}x`, speedX + meterWidth / 2, startY + meterHeight / 2);
 }
 
-function drawEffectsStack() {
-    const myEffects = audioState.effects[myChannel];
-    
-    if (myEffects.length === 0) return;
-    
-    const boxWidth = 180;
-    const boxHeight = 60 + (myEffects.length * 40);
-    const x = canv.width - boxWidth - 20;
-    const y = 140;
+function drawGroups() {
+    detectedGroups.forEach((group, index) => {
+        const { centroid, touchCount } = group;
+        
+        const isTrackGroup = (index === 0);
+        const radius = isTrackGroup ? 100 : 80;
+        const color = isTrackGroup ? 'yellow' : 'cyan';
+        
+        // Circle
+        ctx.beginPath();
+        ctx.arc(centroid.x, centroid.y, radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = `rgba(${isTrackGroup ? '255,255,0' : '0,255,255'}, 0.7)`;
+        ctx.lineWidth = 4;
+        ctx.setLineDash([10, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Label
+        const label = isTrackGroup ? 
+            `TRACK ${touchCount}` : 
+            `EFFECT CTRL`;
+        
+        ctx.fillStyle = color;
+        ctx.font = "bold 18px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(label, centroid.x, centroid.y - radius - 15);
+        
+        // Centroid
+        ctx.beginPath();
+        ctx.arc(centroid.x, centroid.y, 6, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+    });
+}
+
+function drawSelectedTrackInfo() {
+    const boxWidth = 250;
+    const boxHeight = 80;
+    const x = 20;
+    const y = 20;
     
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
     ctx.fillRect(x, y, boxWidth, boxHeight);
     
-    ctx.strokeStyle = touchColor;
+    ctx.strokeStyle = trackColors[selectedTrack];
+    ctx.lineWidth = 4;
+    ctx.strokeRect(x, y, boxWidth, boxHeight);
+    
+    ctx.fillStyle = trackColors[selectedTrack];
+    ctx.font = 'bold 32px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(trackNames[selectedTrack], x + 15, y + 50);
+}
+
+function drawEffectsStack() {
+    const effects = audioState.effects[selectedTrack];
+    if (effects.length === 0) return;
+    
+    const boxWidth = 200;
+    const boxHeight = 60 + (effects.length * 45);
+    const x = canv.width - boxWidth - 20;
+    const y = 20;
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.fillRect(x, y, boxWidth, boxHeight);
+    
+    ctx.strokeStyle = trackColors[selectedTrack];
     ctx.lineWidth = 3;
     ctx.strokeRect(x, y, boxWidth, boxHeight);
     
     ctx.fillStyle = 'white';
     ctx.font = 'bold 16px Arial';
     ctx.textAlign = 'left';
-    ctx.fillText('FX STACK:', x + 10, y + 25);
+    ctx.fillText('EFFECTS:', x + 10, y + 25);
     
-    ctx.font = '12px Arial';
-    myEffects.forEach((effect, index) => {
-        const effectY = y + 50 + (index * 40);
+    ctx.font = '14px Arial';
+    effects.forEach((effect, idx) => {
+        const effectY = y + 55 + (idx * 45);
         
         ctx.fillStyle = '#4CAF50';
-        ctx.fillText(`${index + 1}. ${effect.type.toUpperCase()}`, x + 10, effectY);
+        ctx.fillText(`${idx + 1}. ${effect.type}`, x + 10, effectY);
         
         ctx.fillStyle = '#FFD700';
-        ctx.fillText(`x: ${effect.x.toFixed(2)}`, x + 10, effectY + 15);
+        ctx.fillText(`X: ${effect.x.toFixed(2)}`, x + 10, effectY + 20);
         
         ctx.fillStyle = '#00BCD4';
-        ctx.fillText(`y: ${effect.y.toFixed(2)}`, x + 90, effectY + 15);
+        ctx.fillText(`Y: ${effect.y.toFixed(2)}`, x + 110, effectY + 20);
     });
 }
 
-function drawClientCount() {
+function drawPlaybackStatus() {
+    const text = audioState.playing ? "⏵ PLAYING" : "⏸ STOPPED";
+    
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(canv.width - 150, canv.height - 50, 130, 30);
     
-    ctx.strokeStyle = 'white';
+    ctx.strokeStyle = audioState.playing ? '#4CAF50' : '#F44336';
     ctx.lineWidth = 2;
     ctx.strokeRect(canv.width - 150, canv.height - 50, 130, 30);
     
-    ctx.fillStyle = 'white';
+    ctx.fillStyle = audioState.playing ? '#4CAF50' : '#F44336';
     ctx.font = 'bold 14px Arial';
     ctx.textAlign = 'left';
-    ctx.fillText(`👥 ${connectedClients} Clients`, canv.width - 140, canv.height - 28);
+    ctx.fillText(text, canv.width - 140, canv.height - 28);
 }
 
-function showChannelAssignment() {
-    ctx.fillStyle = channelColors[myChannel];
-    ctx.fillRect(canv.width / 2 - 150, canv.height / 2 - 150, 300, 300);
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 8;
-    ctx.strokeRect(canv.width / 2 - 150, canv.height / 2 - 150, 300, 300);
+function drawGestureIndicator(x, y, type, track) {
+    ctx.save();
     
-    ctx.fillStyle = "white";
-    ctx.font = "bold 48px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(myChannelName, canv.width / 2, canv.height / 2 - 20);
+    const color = trackColors[track];
     
-    ctx.font = "24px Arial";
-    ctx.fillText(`Channel ${myChannel}`, canv.width / 2, canv.height / 2 + 30);
-    
-    setTimeout(() => {
-        render();
-    }, 2500);
-}
-
-function drawVerticalIndicator(x, y, direction, fingerCount) {
-    const arrowY = direction === 'up' ? -50 : 50;
-    
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x, y + arrowY);
-    ctx.strokeStyle = "cyan";
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    
-    ctx.beginPath();
-    if (direction === 'up') {
-        ctx.moveTo(x, y + arrowY);
-        ctx.lineTo(x - 10, y + arrowY + 15);
-        ctx.moveTo(x, y + arrowY);
-        ctx.lineTo(x + 10, y + arrowY + 15);
-    } else {
-        ctx.moveTo(x, y + arrowY);
-        ctx.lineTo(x - 10, y + arrowY - 15);
-        ctx.moveTo(x, y + arrowY);
-        ctx.lineTo(x + 10, y + arrowY - 15);
+    if (type === 'rotate') {
+        ctx.beginPath();
+        ctx.arc(x, y, 50, 0, 2 * Math.PI);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4;
+        ctx.stroke();
+    } else if (type === 'vertical') {
+        ctx.beginPath();
+        ctx.moveTo(x, y - 40);
+        ctx.lineTo(x, y + 40);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4;
+        ctx.stroke();
+    } else if (type === 'horizontal') {
+        ctx.beginPath();
+        ctx.moveTo(x - 40, y);
+        ctx.lineTo(x + 40, y);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4;
+        ctx.stroke();
     }
-    ctx.stroke();
     
-    ctx.fillStyle = "cyan";
-    ctx.font = "bold 14px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(`${fingerCount}F ${direction}`, x, y + arrowY + (direction === 'up' ? -20 : 35));
-}
-
-function drawHorizontalIndicator(x, y, direction, fingerCount) {
-    const arrowX = direction === 'right' ? 50 : -50;
+    ctx.restore();
     
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + arrowX, y);
-    ctx.strokeStyle = "magenta";
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    
-    ctx.beginPath();
-    if (direction === 'right') {
-        ctx.moveTo(x + arrowX, y);
-        ctx.lineTo(x + arrowX - 15, y - 10);
-        ctx.moveTo(x + arrowX, y);
-        ctx.lineTo(x + arrowX - 15, y + 10);
-    } else {
-        ctx.moveTo(x + arrowX, y);
-        ctx.lineTo(x + arrowX + 15, y - 10);
-        ctx.moveTo(x + arrowX, y);
-        ctx.lineTo(x + arrowX + 15, y + 10);
-    }
-    ctx.stroke();
-    
-    ctx.fillStyle = "magenta";
-    ctx.font = "bold 14px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(`${fingerCount}F ${direction}`, x + arrowX, y - 20);
+    setTimeout(render, 200);
 }
 
 // ============================================
-// Helper Functions
+// Communication
 // ============================================
 
-function sendTouchEvent(action, touchId, x, y) {
-    if (socket.readyState === WebSocket.OPEN && myClientId) {
-        socket.send(JSON.stringify({
-            action: action,
-            clientId: myClientId,
-            touchId: touchId,
-            x: x,
-            y: y,
-            color: touchColor
-        }));
+function sendCommand(command) {
+    if (socket.readyState === WebSocket.OPEN) {
+        command.clientId = myClientId;
+        socket.send(JSON.stringify(command));
     }
 }
 
-function sendGestureEvent(gesture) {
-    if (socket.readyState === WebSocket.OPEN && myClientId) {
-        gesture.clientId = myClientId;
-        socket.send(JSON.stringify(gesture));
-    }
-}
+// ============================================
+// Resize Handler
+// ============================================
 
 window.addEventListener('resize', () => {
     canv.width = window.innerWidth;
@@ -595,21 +582,28 @@ window.addEventListener('resize', () => {
     render();
 });
 
-setTimeout(() => render(), 100);
+// Initial render
+setTimeout(render, 100);
 
 console.log(`
 ╔════════════════════════════════════════╗
 ║  TUI Multi-Touch Audio Controller      ║
 ╚════════════════════════════════════════╝
 
-Finger Mapping:
-  🔄 Rotation    → Channel Volume
-  1F ↕️↔️         → Channel Volume
-  2F ↕️↔️         → Speed (global)
-  3F ↕️↔️         → Effect X parameter
-  4F ↕️↔️         → Effect Y parameter
-  5F ↕️           → Add Effect (up)
-  5F ↓           → Remove Effect (down)
+Touch Groups:
+  Group 1 (1-4 touches) → Select Track
+    1 touch  = Bass
+    2 touches = Drums
+    3 touches = Instruments  
+    4 touches = Vocals
+    
+  Group 2 (any size) → Control Effects
+    on selected track
 
-You control: ${myChannelName || 'waiting...'}
+Gestures:
+  🔄 Rotation  → Volume
+  ↕️ Vertical  → Volume or Effect Y
+  ↔️ Horizontal → Speed or Effect X
+  👆 Tap       → Add Effect
+  ⏰ Long Press → Remove Effect
 `);
