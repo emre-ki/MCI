@@ -34,14 +34,9 @@
 
 
 add [channel] [effekt] [param y] -> gibt ID?
-remove [channel] [id]
+rm [channel] [id]
 set [channel] [id] [param x/y] [value]
 
 ### Probleme:
-- Effekte richtig chainen
-- Effekte neuchainen bei Löschen
+- Effekte swappen bei "Neuordnung"
 
-
-### Notes
-- Mixer zum Zusammenführen von Effekten?
-- d

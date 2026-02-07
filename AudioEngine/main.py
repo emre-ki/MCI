@@ -70,7 +70,7 @@ def main():
 
         if cmd_split[0] == "rm":
             if len(cmd_split) > 2:
-                channels[ch_index].effect_rm(cmd_split[2])
+                channels[ch_index].effect_rm(int(cmd_split[2]))
 
     
     # Fuer testzwecke: CLI aktivieren

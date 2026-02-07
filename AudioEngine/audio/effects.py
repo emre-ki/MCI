@@ -26,7 +26,8 @@ class Effect:
         self.fx_node.setInput(new_in)
         
     def stop(self):
-        self.node.stop()
+        self.mix_node.stop()
+        self.fx_node.stop()
 
 class EffectsFactory:
     def create(fx_type, input_signal, y_init):

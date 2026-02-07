@@ -20,16 +20,15 @@ class AudioChannel:
 
         # Statt SfPlayer lieber SndTable
         self.table = SndTable(initchnls=2) # Leere Table beim Start
-        self.phasor = Phasor(freq=0) #, loop=True) # "Abspielkopf", Freq 0 -> stehender Kopf
+        self.phasor = Phasor(freq=0) # "Abspielkopf", Freq 0 -> stehender Kopf
         self.player = Pointer(table=self.table, index=self.phasor)
 
         # Output Routing
-        self.amp = SigTo(1, time=0.5)
+        self.amp = SigTo(1, time=0.05)
         self.effects = []
         self.player.setMul(self.amp)
         self.player.out()
 
-        #self.output = SigTo(1, time=0.5, init=1)
         self.output = Switch(input=self.player, outs=1)
         self.output.out()
         #self.fx_output = None #Switch(input=None, outs=1)
@@ -47,10 +46,8 @@ class AudioChannel:
 
         duration = self.table.getDur()
         if duration > 0:
-            #self.output.setInput(self.player)
             self.phasor.setFreq(self.speed_val.value / duration)
             self.phasor.reset() # An Anfang spulen
-            #self.player.setIndex(self.phasor)
 
     def toggle_mute(self):
         self.muted = not self.muted
@@ -128,9 +125,41 @@ class AudioChannel:
         #self.output.out()
 
     def effect_rm(self, id):
-        # effects.remove([]) evtll mit list comprehension, jetzt erstmal nur per index
+        # evtll suche nach ID in Zukunft statt nur Index
+
         print(f"\tEntferne Effekt an Stelle {id}")
-        #effects.remove(id)
+        # falls index hoeher als elemente in liste
+        fx_size = len(self.effects)
+        if id >= fx_size:
+            return
+
+        effect_node = self.effects[id]
+        
+        # faelle zu beachten
+        # 1. einziger effekt in chain (-> rohen input direkt in out)
+        if fx_size == 1:
+            self.last_input = self.player
+            self.last_amp = self.amp
+            self.output.setInput(self.last_input)
+        # 2. letzter effekt in chain (-> nur vorheriges element zum output chainen)
+        elif id == (fx_size - 1):
+            prev_node = self.effects[id - 1]
+            self.last_input = prev_node["wrapper"].mix_node
+            self.last_amp = prev_node["amp"]
+            self.output.setInput(self.last_input)
+        # 3. erster effekt in chain (-> rohen input in naechstes element chainen)
+        elif id == 0:
+            next_node = self.effects[id + 1]
+            next_node["wrapper"].fx_node.setInput(self.player)
+        # sonst mittendrin
+        else:
+            prev_mixer = self.effects[id - 1]["wrapper"].mix_node
+            next_node = self.effects[id + 1]
+            next_node["wrapper"].fx_node.setInput(prev_mixer)
+
+        effect_node["wrapper"].stop()
+        self.effects.pop(id)
+
 
     def effect_set(self, id, param, value):
         print(f"\tSetze Parameter {param} von Effekt {id} gleich {value}")
@@ -138,15 +167,18 @@ class AudioChannel:
         if id >= len(self.effects):
             return
 
-       #print(self.effects[id])
-       #return
+        effect_node = self.effects[id]
         
         if param == 'x':
-            self.effects[id]["wrapper"].set_x(value)
+            effect_node["wrapper"].set_x(value)
         elif param == 'y':
-            self.effects[id]["wrapper"].set_y(value)
+            effect_node["wrapper"].set_y(value)
         else:
             print("Parameter ist nicht x oder y")
             return
 
+    def effect_swap(self):
+        # effekt chain swappen
+        # noetig, damit die reihenfolge ggf geaendert werden kann
+        pass
 
