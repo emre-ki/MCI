@@ -26,23 +26,41 @@ class Effect:
         self.fx_node.setInput(new_in)
         
     def stop(self):
-        self.node.stop()
+        self.mix_node.stop()
+        self.fx_node.stop()
 
 class EffectsFactory:
     def create(fx_type, input_signal, y_init):
-        x_init = 1
+        x_init = 0.5
         y_init = float(y_init)
 
         def make_sig(val): return SigTo(val, time=0.05, init=val)
 
-        if fx_type == "lowpass":
-            # 1. Mapping-Logik definieren (als Lambda oder Funktion)
-            # 0.0 -> 50Hz, 1.0 -> 15000Hz
-            map_freq = lambda x: 50 + (x * 15000)
-            map_res  = lambda x: 0.5 + (x * 10)   # Resonance Q
+        if fx_type == "lowcut":
+            # Mapping Logik: 0.0 -> 50Hz, 1.0 -> 1500Hz
+            map_freq = lambda x: 50 + (x * 1450)
+            map_res  = lambda x: 0.5 + (x * 10)   # Resonance Q ?
 
             init_freq = map_freq(x_init)
-            init_res = map_res(x_init)
+            init_res = map_res(y_init)
+
+            sig_freq = make_sig(init_freq)
+            sig_res = make_sig(init_res)
+
+            node = ButHP(input_signal, freq=sig_freq, mul=1)
+            mixer = node
+           #mixer = Mixer(outs=1, chnls=2)
+           #mixer.addInput(0, node)
+
+            return Effect(node, mixer, sig_freq, sig_res, map_freq, map_res)
+
+        elif fx_type == "hicut":
+            # Bereich 20kHz bis 400Hz
+            map_freq = lambda x: 20000 - (x * 19600)
+            map_res  = lambda x: 0.5 + (x * 10)   # Resonance Q ?
+
+            init_freq = map_freq(x_init)
+            init_res = map_res(y_init)
 
             sig_freq = make_sig(init_freq)
             sig_res = make_sig(init_res)
@@ -54,8 +72,43 @@ class EffectsFactory:
 
             return Effect(node, mixer, sig_freq, sig_res, map_freq, map_res)
 
-        elif fx_type == "hipass":
-            pass
+        elif fx_type == "lowboost":
+            boost_limit = 12.0
+            map_boost = lambda x: min(boost_limit, x * boost_limit)
+            # 0.0 -> 50Hz, 1.0 -> 400Hz
+            map_freq = lambda x: 50 + (x * 350)
+
+            init_boost = map_boost(x_init)
+            init_freq = map_freq(y_init)
+
+            sig_boost = make_sig(init_boost)
+            sig_freq = make_sig(init_freq)
+
+            node = EQ(input_signal, boost=sig_boost, freq=sig_freq, type=1, mul=1) # type 1 = lowshelf
+            mixer = node
+           #mixer = Mixer(outs=1, chnls=2)
+           #mixer.addInput(0, node)
+
+            return Effect(node, mixer, sig_boost, sig_freq, map_boost, map_freq)
+
+        elif fx_type == "hiboost":
+            boost_limit = 12.0
+            map_boost = lambda x: min(boost_limit, x * boost_limit)
+            # 0.0 -> 22kHz, 1.0 -> 2kHz
+            map_freq = lambda x: 22000 - (x * 20000)
+
+            init_boost = map_boost(x_init)
+            init_freq = map_freq(y_init)
+
+            sig_boost = make_sig(init_boost)
+            sig_freq = make_sig(init_freq)
+
+            node = EQ(input_signal, boost=sig_boost, freq=sig_freq, type=2, mul=1) # type 2 = hishelf 
+            mixer = node
+           #mixer = Mixer(outs=1, chnls=2)
+           #mixer.addInput(0, node)
+
+            return Effect(node, mixer, sig_boost, sig_freq, map_boost, map_freq)
 
         elif fx_type == "reverb":
             map_size = lambda x: 0.2 + (x * 0.75)

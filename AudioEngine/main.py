@@ -62,7 +62,7 @@ def main():
         ch_index = int(cmd_split[1])
         if cmd_split[0] == "set":
             if len(cmd_split) > 4:
-                channels[ch_index].effect_set(cmd_split[2], cmd_split[3], cmd_split[4])
+                channels[ch_index].effect_set(int(cmd_split[2]), cmd_split[3], float(cmd_split[4]))
 
         if cmd_split[0] == "add":
             if len(cmd_split) > 3:
@@ -70,7 +70,7 @@ def main():
 
         if cmd_split[0] == "rm":
             if len(cmd_split) > 2:
-                channels[ch_index].effect_rm(cmd_split[2])
+                channels[ch_index].effect_rm(int(cmd_split[2]))
 
     
     # Fuer testzwecke: CLI aktivieren

@@ -73,12 +73,13 @@ s = Server()
 s.boot()
 s.start()
 
-sf_bass =   SfPlayer(f"{base_pfad}/{song_pfad}/Bass.mp3").out()
-sf_drums =  SfPlayer(f"{base_pfad}/{song_pfad}/Drums.mp3").out()
-sf_instr =  SfPlayer(f"{base_pfad}/{song_pfad}/Instruments.mp3").out()
+sf_bass =   SfPlayer(f"{base_pfad}/{song_pfad}/Bass.mp3")#.out()
+sf_drums =  SfPlayer(f"{base_pfad}/{song_pfad}/Drums.mp3")#.out()
+sf_instr =  SfPlayer(f"{base_pfad}/{song_pfad}/Instruments.mp3")#.out()
 sf_vocals = SfPlayer(f"{base_pfad}/{song_pfad}/Vocals.mp3")
 
-d = Delay(sf_vocals, delay=1.5, feedback=.8).out()
+#d = Delay(sf_vocals, delay=1.5, feedback=.8).out()
+d = ButHP(sf_vocals, freq=5000).out()
 #e = Harmonizer(d, transpo=-5, winsize=0.05).out()
 
 s.gui(locals())

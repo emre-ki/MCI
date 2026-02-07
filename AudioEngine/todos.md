@@ -25,23 +25,23 @@
     + Effekt nur auf eine Spur anwenden
     [+] Reverb
     [+] Delay
-    [ ] EQ Bass
-    [ ] EQ Highs
+    [+] Low-Cut
+    [+] Hi-Cut
+    [+] Low-Boost
+    [ ] Hi-Boost
     [ ] Gate
-    [ ] ...
-    [ ] ...
-    [ ] ...
+    [ ] Bitcrush
+    [ ] Flanger/Chorus
 
 
 add [channel] [effekt] [param y] -> gibt ID?
-remove [channel] [id]
+rm [channel] [id]
 set [channel] [id] [param x/y] [value]
 
-### Probleme:
-- Effekte richtig chainen
-- Effekte neuchainen bei Löschen
-
+### Probleme
+- Effekte swappen bei "Neuordnung"
 
 ### Notes
-- Mixer zum Zusammenführen von Effekten?
-- d
+- Hohe Frequenzen: ca 1khz bis 20khz
+- Low Frequenzen: 40/50Hz bis 500Hz
+    -> 
