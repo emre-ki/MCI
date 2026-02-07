@@ -62,7 +62,7 @@ const colors = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8", "#F7DC6F"
 
 function addClient() {
     if (colors.length === 0) {
-        console.warn("⚠️ No colors available");
+        console.warn("Keine weiteren Clients verfügbar");
         return null;
     }
     const color = colors.shift();
@@ -109,7 +109,7 @@ wss.on('connection', function connection(ws) {
     }
     
     ws.clientId = client.id;
-    console.log(`✓ Client ${client.id} connected (${client.color})`);
+    console.log(`Client ${client.id} connected (${client.color})`);
 
     // Send client info
     ws.send(JSON.stringify({
@@ -132,7 +132,7 @@ wss.on('connection', function connection(ws) {
             if (message.action === "START_PLAYBACK") {
                 console.log(`🎬 Start playback: ${message.song}`);
                 
-                const songPath = message.song || "song1";
+                const songPath = message.song || "Kanye";
                 
                 sendToAudioBridge({
                     action: "LOAD_SONG",

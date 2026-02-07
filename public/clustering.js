@@ -84,8 +84,6 @@ export class TouchClustering {
                     }
                 }
             }
-
-            // Nur Cluster mit mindestens 2 Punkten sind interessant
            
             clusters.push({
                 touches: cluster,
