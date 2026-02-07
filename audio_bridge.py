@@ -16,15 +16,19 @@ try:
     # Adjust imports based on your project structure
     from AudioEngine.audio.engine import AudioEngine
     from AudioEngine.audio.channel import AudioChannel
-    from AudioEngine.config import BASE_PATH, SONG_PATH
 except ImportError as e:
     print(f"❌ Import Error: {e}")
     print("💡 Make sure the script runs in the correct directory!")
     sys.exit(1)
 
-# Default paths
-BASE_PATH = os.path.expanduser("musik_files")  
+# Ermittelt den Ordner, in dem dieses Skript liegt (AudioEngine)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Wir hängen 'musik_files' direkt an den Skript-Ordner an
+BASE_PATH = os.path.join(SCRIPT_DIR, "AudioEngine/musik_files")
 DEFAULT_SONG = "KanyeWest-FlashingLights"
+
+print(f"🔍 Suche Musik in: {BASE_PATH}")
 
 
 class AudioBridge:
@@ -48,30 +52,34 @@ class AudioBridge:
     # ========== SONG LOADING & PLAYBACK ==========
     
     def load_song(self, song_path):
-        """Loads song into all channels and starts playback"""
+        """Loads song using the same logic as your main.py"""
         print(f"📀 Loading: {song_path}")
         
-        full_path = f"{BASE_PATH}/{song_path}"
+        # In deiner main.py wird BASE_PATH/SONG_PATH zusammengefügt
+        # WICHTIG: Deine main.py nutzt anscheinend nur den Ordnernamen!
+        full_path = os.path.join(BASE_PATH, song_path)
         
+        # Prüfen ob der Ordner existiert
+        if not os.path.exists(full_path):
+            print(f"❌ FOLDER NOT FOUND: {full_path}")
+            return False
+
         try:
-            for i, channel in enumerate(self.channels):
-                track_path = f"{full_path}/{self.channel_names[i]}.mp3"
-                
-                if not os.path.exists(track_path):
-                    print(f"⚠️  Warning: {track_path} not found")
-                    continue
-                
-                channel.load(full_path)
-                print(f"  ✓ Loaded {self.channel_names[i]}")
+            # Wir machen es EXAKT wie in deiner main.py:
+            # [channels[i].load(f"{BASE_PATH}/{SONG_PATH}") for i in range(4)]
+            for i in range(4):
+                self.channels[i].load(full_path)
+                print(f"  ✓ Channel {i} loading from: {full_path}")
             
+            # WICHTIG: Diese Zeilen müssen AUSSERHALB der for-schleife stehen
             self.current_song = song_path
             self.is_playing = True
             
-            print(f"✅ Playback started: {song_path}")
+            print(f"✅ Playback command sent for: {song_path}")
             return True
             
         except Exception as e:
-            print(f"❌ Error loading song: {e}")
+            print(f"❌ Error during load: {e}")
             return False
     
     # ========== PARAMETER CONTROLS ==========
