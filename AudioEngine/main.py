@@ -4,7 +4,8 @@ from config import BASE_PATH
 from config import SONG_PATH
 from audio.engine import AudioEngine
 from audio.channel import AudioChannel
-from interface.cli import AudioShell
+#from interface.cli import AudioShell
+from interface.server import AudioSocketServer
 
 def main():
     # Engine starten
@@ -82,11 +83,17 @@ def main():
 
     
     # Fuer testzwecke: CLI aktivieren
-    cli = AudioShell(handle_cmd, handle_fx_cmd)
+   #cli = AudioShell(handle_cmd, handle_fx_cmd)
+   #try:
+   #    cli.cmdloop()
+   #except KeyboardInterrupt:
+   #    pass
+
+    server = AudioSocketServer(handle_cmd, handle_fx_cmd)
     try:
-        cli.cmdloop()
+        server.start(port=8080)
     except KeyboardInterrupt:
-        pass
+        print("\nEngine stoppen...")
     
     engine.stop()
 
