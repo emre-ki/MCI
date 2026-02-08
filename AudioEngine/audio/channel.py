@@ -142,12 +142,12 @@ class AudioChannel:
         # 3. erster effekt in chain (-> rohen input in naechstes element chainen)
         elif id == 0:
             next_node = self.effects[id + 1]
-            next_node["wrapper"].in_node.setInput(self.player)
+            next_node["wrapper"].set_input(self.player)
         # sonst mittendrin
         else:
             prev_mixer = self.effects[id - 1]["wrapper"].out_node
             next_node = self.effects[id + 1]
-            next_node["wrapper"].in_node.setInput(prev_mixer)
+            next_node["wrapper"].set_input(prev_mixer)
 
         effect_node["wrapper"].stop()
         self.effects.pop(id)
@@ -172,5 +172,32 @@ class AudioChannel:
     def effect_swap(self):
         # effekt chain swappen
         # noetig, damit die reihenfolge ggf geaendert werden kann
-        pass
+        # funktioniert nur mit 2 effekten !
 
+        # OOB zugriffe verhindern oder swappen mit sich selber
+        fx_size = len(self.effects)
+        if fx_size != 2: return
+
+        # FX A und FX B zwischenspeichern
+        fx_a = self.effects[0]
+        fx_b = self.effects[1]
+
+        # Chaining swappen
+        fx_a_out = fx_a["wrapper"].out_node
+        fx_b_out = fx_b["wrapper"].out_node
+        fx_a["wrapper"].set_input(fx_b_out)
+        fx_b["wrapper"].set_input(self.player)
+        self.output.setInput(fx_a_out)
+
+        # Position im Array tauschen
+        self.effects[0] = fx_b
+        self.effects[1] = fx_a
+
+        # sicherheitshalber last... anpassen
+        self.last_input = self.effects[fx_size-1]["wrapper"]
+        self.last_amp = self.effects[fx_size-1]["amp"]
+
+    def effects_print(self):
+        for fx in self.effects:
+            print(fx)
+        return

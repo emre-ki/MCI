@@ -66,13 +66,19 @@ def main():
             if len(cmd_split) > 4:
                 channels[ch_index].effect_set(int(cmd_split[2]), cmd_split[3], float(cmd_split[4]))
 
-        if cmd_split[0] == "add":
+        elif cmd_split[0] == "add":
             if len(cmd_split) > 3:
                 channels[ch_index].effect_add(cmd_split[2], cmd_split[3])
 
-        if cmd_split[0] == "rm":
+        elif cmd_split[0] == "rm":
             if len(cmd_split) > 2:
                 channels[ch_index].effect_rm(int(cmd_split[2]))
+
+        elif cmd_split[0] == "swap":
+            channels[ch_index].effect_swap()
+
+        elif cmd_split[0] == "print":
+            channels[ch_index].effects_print()
 
     
     # Fuer testzwecke: CLI aktivieren
