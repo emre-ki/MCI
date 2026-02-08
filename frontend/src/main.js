@@ -2,23 +2,36 @@
 import { TouchManager } from './TouchManager.js';
 import { Renderer } from './Renderer.js';
 import { PatternRecognizer } from './PatternRecognizer.js';
+import { ObjectManager } from './ObjectManager.js';
 
 const canvas = document.getElementById('appCanvas');
+const statusDiv = document.getElementById('status');
+const btnAdd = document.getElementById('btnAdd');
+const btnRemove = document.getElementById('btnRemove');
 
 // 1. Instanzen erstellen
 const touchManager = new TouchManager(canvas);
 const recognizer = new PatternRecognizer();
-const renderer = new Renderer(canvas, touchManager, recognizer);
+const objectManager = new ObjectManager(recognizer);
+const renderer = new Renderer(canvas, touchManager, recognizer, objectManager);
 
-// ---------------------------------------------------------
-// 2. MUSTER KONFIGURATION (Hier definierst du deine Objekte)
-// ---------------------------------------------------------
+objectManager.setUIUpdate((msg, type) => {
+    statusDiv.innerText = msg;
+    statusDiv.className = type; // z.B. 'scanning' für CSS Animation
+});
 
+btnAdd.addEventListener('click', () => {
+    objectManager.startAddMode(5000); // 5 Sekunden Scanzeit
+});
+
+btnRemove.addEventListener('click', () => {
+    objectManager.startRemoveMode(5000);
+});
+
+// Muster definieren
 const size = 64; // ca 65px Abstand zwischen Noppen
 
 // Tonspuren
-/*
-*/
 recognizer.addPattern("DRUMS", [
     {x: size, y: 0},       // Oben Links
     {x: 2*size, y: 0},    // Oben Rechts
@@ -88,8 +101,6 @@ recognizer.addPattern("GATE", [
     {x: 0, y: 2*size}
 ]);
 
-/*
-*/
 recognizer.addPattern("DELAY", [
     {x: 0, y: 0},
     {x: size, y: -(0.33 * size)},
@@ -124,8 +135,6 @@ recognizer.addPattern("CRUSH", [
 
 
 
-// ---------------------------------------------------------
-
-// 3. Starten
+// Starten
 renderer.start();
 console.log("System läuft. Lege 3 Finger auf!");

@@ -111,7 +111,8 @@ export class PatternRecognizer {
                 this.activeObjects.push({
                     id: pattern.id,
                     points: subset,
-                    center: this.getCenter(subset)
+                    center: this.getCenter(subset),
+                    rotation: this.calculateAngle(subset)
                 });
             }
         }
@@ -173,6 +174,29 @@ export class PatternRecognizer {
             sum += (p2.x - p1.x) * (p2.y + p1.y);
         }
         return sum;
+    }
+
+    /**
+     * Berechnet die Rotation in Radiant (0 bis 2*PI).
+     * Wir nehmen den Vektor vom Zentrum zum ersten Punkt der sortierten Liste (Canonical Order).
+     */
+    calculateAngle(subset, pattern) { // pattern parameter wird hier nicht zwingend gebraucht, aber gut für Offset
+        const center = this.getCenter(subset);
+        
+        // WICHTIG: Wir müssen die Punkte erst sortieren, damit wir immer denselben "Ankerpunkt" nehmen!
+        const sortedPoints = this.getCanonicalOrder(subset);
+        const anchorPoint = sortedPoints[0]; // Der Punkt, der am nächsten (oder weitesten) zum Zentrum ist
+
+        const dx = anchorPoint.x - center.x;
+        const dy = anchorPoint.y - center.y;
+
+        // Math.atan2 liefert Werte von -PI bis +PI. Wir normalisieren das oft auf 0..2PI
+        let angle = Math.atan2(dy, dx);
+        
+        // Optional: Offset abziehen, falls das Pattern "schief" definiert wurde
+        // (Hier vereinfacht: Wir nehmen den gemessenen Winkel als Ist-Wert)
+        
+        return angle;
     }
 
     getCombinations(array, k) {
