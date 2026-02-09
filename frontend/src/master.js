@@ -5,8 +5,8 @@ const canvas = document.getElementById('turntableCanvas');
 const ctx = canvas.getContext('2d');
 
 const socketUrl = window.location.hostname === '10.224.32.7' 
-    ? 'http://localhost:8080' 
-    : `http://${window.location.hostname}:8080`;
+    ? `http://${window.location.hostname}:8080`
+    : 'http://localhost:8080';
 
 const socketClient = new SocketClient(socketUrl);
 

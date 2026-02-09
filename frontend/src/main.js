@@ -3,6 +3,13 @@ import { TouchManager } from './TouchManager.js';
 import { Renderer } from './Renderer.js';
 import { PatternRecognizer } from './PatternRecognizer.js';
 import { ObjectManager } from './ObjectManager.js';
+import { SocketClient } from './SocketClient.js';
+
+const socketUrl = window.location.hostname === '10.224.32.7' 
+    ? `http://${window.location.hostname}:8080`
+    : 'http://localhost:8080';
+
+const socketClient = new SocketClient(socketUrl);
 
 const canvas = document.getElementById('appCanvas');
 const statusDiv = document.getElementById('status');
@@ -12,7 +19,7 @@ const btnRemove = document.getElementById('btnRemove');
 // 1. Instanzen erstellen
 const touchManager = new TouchManager(canvas);
 const recognizer = new PatternRecognizer();
-const objectManager = new ObjectManager(recognizer);
+const objectManager = new ObjectManager(recognizer, socketClient);
 const renderer = new Renderer(canvas, touchManager, recognizer, objectManager);
 
 objectManager.setUIUpdate((msg, type) => {
@@ -29,8 +36,8 @@ btnRemove.addEventListener('click', () => {
 });
 
 // Muster definieren
-const size = 52; // ca 65px Abstand zwischen Noppen
-//const size = 64; // ca 65px Abstand zwischen Noppen
+//const size = 52; // ca 65px Abstand zwischen Noppen
+const size = 64; // ca 65px Abstand zwischen Noppen
 
 // Tonspuren
 recognizer.addPattern("DRUMS", [

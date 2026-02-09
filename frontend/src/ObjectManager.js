@@ -1,6 +1,7 @@
 export class ObjectManager {
-    constructor(recognizer) {
+    constructor(recognizer, socketClient) {
         this.recognizer = recognizer;
+        this.socketClient = socketClient;
         
         // Die persistenten Objekte ("Gestempelt")
         // Struktur: { uuid: 1, id: "WÜRFEL", x: 100, y: 100, rotation: 0.5 }
@@ -15,7 +16,8 @@ export class ObjectManager {
         this.scanTimeout = null;
         this.statusCallback = (msg, state) => console.log(msg); // Dummy Callback
         
-        this.smoothing = 0.2;
+        this.smoothing = 0.15;
+        this.updateThreshold = 0.005;
     }
 
     setUIUpdate(callback) {
@@ -65,6 +67,7 @@ export class ObjectManager {
         }
 
         this.calculateSignalChain();
+        this.broadcastUpdates();
     }
 
     updateLivePositions(livePatterns) {
@@ -161,6 +164,9 @@ export class ObjectManager {
         };
 
         this.virtualObjects.push(newObj);
+
+        if(newObj.type === 'EFFECT')
+            this.broadcastEffectAdd(newObj);
         
         // 3. Modus beenden (Erfolg)
         this.state = 'IDLE';
@@ -178,6 +184,11 @@ export class ObjectManager {
 
         if (matchIndex !== -1) {
             // Löschen
+            if(this.virtualObjects[matchIndex].type === 'EFFECT') {
+                this.broadcastEffectRm(this.virtualObjects[matchIndex]);
+            } else {
+                this.broadcastTrackRm(this.virtualObjects[matchIndex]);
+            }
             const removed = this.virtualObjects.splice(matchIndex, 1);
             
             this.state = 'IDLE';
@@ -260,5 +271,161 @@ export class ObjectManager {
         
         // Begrenzen (Clamping) zwischen 0.0 und 1.0
         return Math.max(0.0, Math.min(1.0, t));
+    }
+
+    broadcastUpdates() {
+        if (!this.socketClient) return;
+
+        this.virtualObjects.forEach(obj => {
+            // Prüfen: Hat sich X oder Y signifikant geändert?
+            const diffX = Math.abs(obj.parameterX - obj.lastSentX);
+            const diffY = Math.abs(obj.parameterY - obj.lastSentY);
+
+            if (diffX > this.updateThreshold) {
+                
+                // Senden!
+                if(obj.type === 'EFFECT') {
+                    const tracks = this.virtualObjects.filter(o => o.type === 'TRACK');
+                    const effects = this.virtualObjects.filter(o => o.type === 'EFFECT');
+                    const effect_id = effects.findIndex(x => x.uuid === obj.uuid)
+                    tracks.forEach((track) => {
+                        let track_id = 0
+                        switch(obj.id) {
+                            case "BASS":
+                                track_id = 0;
+                                break;
+                            case "DRUMS":
+                                track_id = 1;
+                                break;
+                            case "INSTRUMENTS":
+                                track_id = 2;
+                                break;
+                            case "VOCALS":
+                                track_id = 3;
+                                break;
+                        }
+                        this.socketClient.send('fx', `set ${track_id} ${effect_id} x ${obj.parameterX}`);
+                    }) 
+
+                } else {
+                    let track_id = 0
+                    switch(obj.id) {
+                        case "BASS":
+                            track_id = 0;
+                            break;
+                        case "DRUMS":
+                            track_id = 1;
+                            break;
+                        case "INSTRUMENTS":
+                            track_id = 2;
+                            break;
+                        case "VOCALS":
+                            track_id = 3;
+                            break;
+                    }
+                    this.socketClient.send('cmd', `volume ${track_id} ${obj.parameterX}`);
+                }
+
+                // Memory updaten
+                obj.lastSentX = obj.parameterX;
+            }
+            if(diffY > this.updateThreshold) {
+                if(obj.type === 'TRACK') { return; }
+                const tracks = this.virtualObjects.filter(o => o.type === 'TRACK');
+                const effects = this.virtualObjects.filter(o => o.type === 'EFFECT');
+                const effect_id = effects.findIndex(x => x.uuid === obj.uuid)
+                tracks.forEach((track) => {
+                    let track_id = 0
+                    switch(obj.id) {
+                        case "BASS":
+                            track_id = 0;
+                            break;
+                        case "DRUMS":
+                            track_id = 1;
+                            break;
+                        case "INSTRUMENTS":
+                            track_id = 2;
+                            break;
+                        case "VOCALS":
+                            track_id = 3;
+                            break;
+                    }
+                    this.socketClient.send('fx', `set ${track_id} ${effect_id} y ${obj.parameterY}`);
+                }) 
+                obj.lastSentY = obj.parameterY;
+            }
+        });
+    }
+
+    broadcastEffectAdd(new_fx) {
+        const tracks = this.virtualObjects.filter(o => o.type === 'TRACK');
+        const fx_lowercase = new_fx.id.toLowerCase()
+        tracks.forEach((track) => {
+            let track_id = 0
+            switch(obj.id) {
+                case "BASS":
+                    track_id = 0;
+                    break;
+                case "DRUMS":
+                    track_id = 1;
+                    break;
+                case "INSTRUMENTS":
+                    track_id = 2;
+                    break;
+                case "VOCALS":
+                    track_id = 3;
+                    break;
+            }
+            this.socketClient.send('fx', `add ${track_id} ${fx_lowercase} 0.5`);
+        }) 
+
+    }
+
+    broadcastEffectRm(rm_fx) {
+        const tracks = this.virtualObjects.filter(o => o.type === 'TRACK');
+        const effects = this.virtualObjects.filter(o => o.type === 'EFFECT');
+        const effect_id = effects.findIndex(x => x.uuid === rm_fx.uuid)
+        tracks.forEach((track) => {
+            let track_id = 0
+            switch(obj.id) {
+                case "BASS":
+                    track_id = 0;
+                    break;
+                case "DRUMS":
+                    track_id = 1;
+                    break;
+                case "INSTRUMENTS":
+                    track_id = 2;
+                    break;
+                case "VOCALS":
+                    track_id = 3;
+                    break;
+            }
+            this.socketClient.send('fx', `rm ${track_id} ${effect_id}`);
+        }) 
+    }
+
+    broadcastTrackRm(rm_track) {
+        const tracks = this.virtualObjects.filter(o => o.type === 'TRACK');
+        const effects = this.virtualObjects.filter(o => o.type === 'EFFECT');
+        let track_id = 0
+        switch(obj.id) {
+            case "BASS":
+                track_id = 0;
+                break;
+            case "DRUMS":
+                track_id = 1;
+                break;
+            case "INSTRUMENTS":
+                track_id = 2;
+                break;
+            case "VOCALS":
+                track_id = 3;
+                break;
+        }
+        effects.forEach((fx) => {
+            const effect_id = effects.findIndex(x => x.uuid === fx.uuid)
+            this.socketClient.send('fx', `rm ${track_id} ${effect_id}`);
+        }) 
     }
 }
