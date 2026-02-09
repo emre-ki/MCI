@@ -160,7 +160,10 @@ export class ObjectManager {
             rotation: pattern.rotation,
             initialRotation: currentRotation,
             parameterX: 0.5,
-            isTracking: true
+            parameterY: 0.5,
+            isTracking: true,
+            lastSentX: -1,
+            lastSentY: -1
         };
 
         this.virtualObjects.push(newObj);
@@ -362,7 +365,7 @@ export class ObjectManager {
         const fx_lowercase = new_fx.id.toLowerCase()
         tracks.forEach((track) => {
             let track_id = 0
-            switch(obj.id) {
+            switch(track.id) {
                 case "BASS":
                     track_id = 0;
                     break;
@@ -387,7 +390,7 @@ export class ObjectManager {
         const effect_id = effects.findIndex(x => x.uuid === rm_fx.uuid)
         tracks.forEach((track) => {
             let track_id = 0
-            switch(obj.id) {
+            switch(track.id) {
                 case "BASS":
                     track_id = 0;
                     break;
@@ -409,7 +412,7 @@ export class ObjectManager {
         const tracks = this.virtualObjects.filter(o => o.type === 'TRACK');
         const effects = this.virtualObjects.filter(o => o.type === 'EFFECT');
         let track_id = 0
-        switch(obj.id) {
+        switch(rm_track.id) {
             case "BASS":
                 track_id = 0;
                 break;
