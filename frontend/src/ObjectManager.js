@@ -5,6 +5,11 @@ export class ObjectManager {
         // Die persistenten Objekte ("Gestempelt")
         // Struktur: { uuid: 1, id: "WÜRFEL", x: 100, y: 100, rotation: 0.5 }
         this.virtualObjects = [];
+        this.connections = [];
+
+        // --- KONFIGURATION ---
+        this.minDistance = 150; // Pixel (Nah = 0.0)
+        this.maxDistance = 600; // Pixel (Fern = 1.0)
         
         this.state = 'IDLE'; // IDLE, SCAN_ADD, SCAN_REMOVE
         this.scanTimeout = null;
@@ -58,6 +63,8 @@ export class ObjectManager {
         else if (this.state === 'SCAN_REMOVE' && detectedPatterns.length > 0) {
             this.handleRemoving(detectedPatterns[0]);
         }
+
+        this.calculateSignalChain();
     }
 
     updateLivePositions(livePatterns) {
@@ -79,7 +86,24 @@ export class ObjectManager {
                 virtual.y = this.lerp(virtual.y, live.center.y, this.smoothing);
                 
                 // Rotation interpolieren (Achtung beim Sprung von 360° auf 0°)
-                virtual.rotation = this.lerpAngle(virtual.rotation, live.rotation || 0, this.smoothing);
+                const currentRawRotation = live.rotation || 0;
+                virtual.rotation = this.lerpAngle(virtual.rotation, currentRawRotation, this.smoothing);
+
+                // C. NEU: Parameter X (Relative Rotation) berechnen
+                // 1. Differenz zur Start-Rotation berechnen
+                let angleDiff = virtual.rotation - virtual.initialRotation;
+                
+                // 2. WICHTIG: Normalisieren auf -PI bis +PI
+                // Verhindert Sprünge, wenn man über die 360° Grenze dreht.
+                angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+
+                // 3. Mappen auf 0.0 bis 1.0
+                // Wir definieren: -180° (-PI) = 0.0 | 0° = 0.5 | +180° (+PI) = 1.0
+                // Formel: (diff + PI) / (2 * PI)
+                virtual.parameterX = (angleDiff + Math.PI) / (2 * Math.PI);
+
+                // Safety Clamping (wegen Floating Point Ungenauigkeiten)
+                virtual.parameterX = Math.max(0.0, Math.min(1.0, virtual.parameterX));
                 
                 // Flag setzen: Das Objekt wird gerade "angefasst" (für den Renderer)
                 virtual.isTracking = true;
@@ -121,13 +145,19 @@ export class ObjectManager {
             return;
         }
 
+        const currentRotation = pattern.rotation || 0;
+
         // 2. Speichern
         const newObj = {
             uuid: Date.now(), // Eindeutige ID für die Laufzeit
             id: pattern.id,
+            type: pattern.type,
             x: pattern.center.x,
             y: pattern.center.y,
-            rotation: pattern.rotation
+            rotation: pattern.rotation,
+            initialRotation: currentRotation,
+            parameterX: 0.5,
+            isTracking: true
         };
 
         this.virtualObjects.push(newObj);
@@ -154,5 +184,81 @@ export class ObjectManager {
             if (this.scanTimeout) clearTimeout(this.scanTimeout);
             this.statusCallback(`Gelöscht: ${removed[0].id}`, 'success');
         }
+    }
+
+    /**
+     * Neue Logik: Chronologische Kette
+     * 1. Alle Tracks verbinden sich zum allerersten Effekt (Array-Index 0).
+     * 2. Effekte verbinden sich strikt der Reihe nach (0 -> 1 -> 2 ...).
+     */
+    calculateSignalChain() {
+        this.connections = []; // Reset
+
+        // 1. Listen trennen
+        // Da wir .push() nutzen, ist die Reihenfolge im Array = Zeitliche Reihenfolge
+        const tracks = this.virtualObjects.filter(o => o.type === 'TRACK');
+        const effects = this.virtualObjects.filter(o => o.type === 'EFFECT');
+
+        if (effects.length === 0) return;
+
+        // A. Der "Master"-Effekt ist immer der erste in der Liste
+        const firstEffect = effects[0];
+
+        /*
+        // B. Verbindung: Alle Tracks -> Erster Effekt
+        if (tracks.length > 0) {
+            tracks.forEach(track => {
+                this.connections.push({
+                    from: track,
+                    to: firstEffect,
+                    type: 'SIGNAL_SOURCE' // Farbe Blau (Quelle)
+                });
+            });
+        }
+        */
+        tracks.forEach(track => {
+            // Distanz berechnen
+            const dist = Math.hypot(firstEffect.x - track.x, firstEffect.y - track.y);
+            
+            // Parameter berechnen (0.0 bis 1.0)
+            const param = this.calculateParameter(dist);
+
+            this.connections.push({
+                from: track,
+                to: firstEffect,
+                type: 'SIGNAL_SOURCE',
+                distance: dist,
+                parameter: param // <--- Der wichtige Wert für dein Audio-System
+            });
+        });
+
+        // C. Die Effekt-Kette (Daisy Chain nach Index)
+        // Wir starten bei Index 1 und verbinden ihn mit dem Vorgänger (Index 0)
+        for (let i = 1; i < effects.length; i++) {
+            const previousEffect = effects[i - 1];
+            const currentEffect = effects[i];
+
+            const dist = Math.hypot(currentEffect.x - previousEffect.x, currentEffect.y - previousEffect.y);
+            const param = this.calculateParameter(dist);
+
+            this.connections.push({
+                from: previousEffect,
+                to: currentEffect,
+                type: 'DAISY_CHAIN', // Farbe Orange (Effekt-Weg)
+                distance: dist,
+                parameter: param
+            });
+        }
+    }
+
+    /**
+     * Wandelt Pixel-Distanz in einen 0..1 Wert um (Clamped)
+     */
+    calculateParameter(distance) {
+        // Formel: (Aktuell - Min) / (Max - Min)
+        let t = (distance - this.minDistance) / (this.maxDistance - this.minDistance);
+        
+        // Begrenzen (Clamping) zwischen 0.0 und 1.0
+        return Math.max(0.0, Math.min(1.0, t));
     }
 }

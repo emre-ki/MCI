@@ -4,7 +4,7 @@ export class PatternRecognizer {
         this.tolerance = 30; 
     }
 
-    addPattern(id, relativePoints) {
+    addPattern(id, relativePoints, type = 'TRACK') {
         // 1. Signatur berechnen (Distanzen)
         const signature = this.calculateSignature(relativePoints);
         
@@ -17,7 +17,8 @@ export class PatternRecognizer {
             id: id,
             pointCount: relativePoints.length,
             signature: signature,
-            winding: winding // Speichern: Ist es links- oder rechtsherum?
+            winding: winding, // Speichern: Ist es links- oder rechtsherum?
+            type: type
         });
 
         console.log(`Muster '${id}' registriert. Winding: ${winding > 0 ? 'Rechts' : 'Links'}`);
@@ -110,6 +111,7 @@ export class PatternRecognizer {
 
                 this.activeObjects.push({
                     id: pattern.id,
+                    type: pattern.type,
                     points: subset,
                     center: this.getCenter(subset),
                     rotation: this.calculateAngle(subset)

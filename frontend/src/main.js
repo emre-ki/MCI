@@ -37,28 +37,28 @@ recognizer.addPattern("DRUMS", [
     {x: 2*size, y: 0},    // Oben Rechts
     {x: 2*size, y: 2*size}, // Unten Rechts
     {x: 0, y: 2*size},    // Unten Links
-]);
+], 'TRACK');
 
 recognizer.addPattern("BASS", [
     {x: 0, y: 0},       // Oben Links
     {x: size, y: 0},    // Oben Rechts
     {x: 2*size, y: 2*size}, // Unten Rechts
     {x: 0, y: 2*size},    // Unten Links
-]);
+], 'TRACK');
 
 recognizer.addPattern("INSTRUMENTS", [
     {x: 0, y: 0},
     {x: size, y: 0},
     {x: size, y: 2*size},
     {x: 2*size, y: 2*size}
-]);
+], 'TRACK');
 
 recognizer.addPattern("VOCALS", [
     {x: 0, y: 0},
     {x: 2*size, y: 0},
     {x: 2*size, y: 2*size},
     {x: 0, y: 2*size}
-]);
+], 'TRACK');
 
 // EFFEKTE
 recognizer.addPattern("LOWPASS", [
@@ -67,7 +67,7 @@ recognizer.addPattern("LOWPASS", [
     {x: size, y: size},
     {x: 2*size, y: 2*size},
     {x: 0, y: 2*size}
-]);
+], 'EFFECT');
 
 recognizer.addPattern("HIPASS", [
     {x: 0, y: 0},
@@ -75,7 +75,7 @@ recognizer.addPattern("HIPASS", [
     {x: 2*size, y: 0},
     {x: 0, y: 2*size},
     {x: 2*size, y: 2*size}
-]);
+], 'EFFECT');
 
 recognizer.addPattern("LOWBOOST", [
     {x: 0, y: 0},
@@ -83,7 +83,7 @@ recognizer.addPattern("LOWBOOST", [
     {x: size, y: size},
     {x: size, y: 2*size + (0.3 * size)},
     {x: 2*size, y: 2*size}
-]);
+], 'EFFECT');
 
 recognizer.addPattern("HIBOOST", [
     {x: 0, y: 0},
@@ -91,7 +91,7 @@ recognizer.addPattern("HIBOOST", [
     {x: 2*size, y: 0},
     {x: 2*size, y: 2*size},
     {x: size, y: 2*size + (0.3 * size)}
-]);
+], 'EFFECT');
 
 recognizer.addPattern("GATE", [
     {x: 0, y: 0},
@@ -99,7 +99,7 @@ recognizer.addPattern("GATE", [
     {x: 2*size, y: 0},
     {x: size, y: 2*size + (0.3 * size)},
     {x: 0, y: 2*size}
-]);
+], 'EFFECT');
 
 recognizer.addPattern("DELAY", [
     {x: 0, y: 0},
@@ -107,7 +107,7 @@ recognizer.addPattern("DELAY", [
     {x: 2*size, y: 0},
     {x: size, y: size},
     {x: 2*size, y: 2*size}
-]);
+], 'EFFECT');
 
 recognizer.addPattern("REVERB", [
     {x: size, y: -(0.33 * size)},
@@ -115,7 +115,7 @@ recognizer.addPattern("REVERB", [
     {x: size, y: size},
     {x: 0, y: size},
     {x: size, y: 2*size + (0.33 * size)},
-]);
+], 'EFFECT');
 
 recognizer.addPattern("FLANGER", [
     {x: 0, y: 0},
@@ -123,7 +123,7 @@ recognizer.addPattern("FLANGER", [
     {x: 2*size, y: 0},
     {x: size, y: size},
     {x: 0, y: 2*size}
-]);
+], 'EFFECT');
 
 recognizer.addPattern("CRUSH", [
     {x: size, y: -(0.3 * size)},
@@ -131,7 +131,7 @@ recognizer.addPattern("CRUSH", [
     {x: size, y: size},
     {x: size, y: 2*size + (0.3 * size)},
     {x: 0, y: 2*size}
-]);
+], 'EFFECT');
 
 
 

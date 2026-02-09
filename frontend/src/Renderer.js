@@ -29,6 +29,11 @@ export class Renderer {
         this.recognizer.update(touches); // Pattern erkennen
         this.objectManager.update();     // Stempel-Logik prüfen
 
+        // Verbindungen zeichnen
+        if (this.objectManager.connections) {
+            this.drawConnections(this.objectManager.connections);
+        }
+
         // 2. Zeichne PERSISTENTE (Virtuelle) Objekte
         this.drawVirtualObjects(this.objectManager.virtualObjects);
 
@@ -36,7 +41,9 @@ export class Renderer {
         // Das zeigt dem Nutzer, dass der Scanner "sieht"
         if (touches.length > 0) {
             this.drawRawTouches(touches);
-            this.drawLivePatterns(this.recognizer.activeObjects);
+            if (this.recognizer.activeObjects.length > 0) {
+                this.drawLivePatterns(this.recognizer.activeObjects);
+            }
         }
 
         requestAnimationFrame(() => this.loop());
@@ -78,6 +85,15 @@ export class Renderer {
         });
         */
         this.ctx.save();
+        objects.forEach(obj => {
+            this.drawAura(obj);
+        });
+        this.ctx.restore();        
+
+        this.ctx.save();
+
+        const effects = objects.filter(o => o.type === 'EFFECT');
+        
         objects.forEach(obj => {
             this.ctx.translate(obj.x, obj.y);
             this.ctx.rotate(obj.rotation || 0);
@@ -208,6 +224,134 @@ export class Renderer {
         });
 
         this.ctx.restore();
+    }
+
+    // Methode zum Zeichnen der Linien
+    drawConnections(connections) {
+        this.ctx.save();
+        this.ctx.lineCap = "round";
+
+        connections.forEach(conn => {
+            const start = conn.from;
+            const end = conn.to;
+
+            const p = conn.parameter;
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(start.x, start.y);
+            this.ctx.lineTo(end.x, end.y);
+
+            const opacity = 0.3 + (0.7 * (1.0 - p)); // Nah (0.0) = Hell (1.0), Fern (1.0) = Dunkel (0.3)
+
+            if (conn.type === 'SIGNAL_SOURCE') {
+                // Track -> First Effect
+                // Dicke, solide Linie (Audio Flow)
+                this.ctx.strokeStyle = "rgba(0, 136, 255, ${opacity})"; // Blaues Leuchten
+                this.ctx.lineWidth = 4 + (4 * (1.0 - p));
+                this.ctx.setLineDash([]); // Durchgezogen
+            } 
+            else if (conn.type === 'DAISY_CHAIN') {
+                // Effect -> Effect
+                // Gestrichelte Linie oder dünner
+                this.ctx.strokeStyle = "rgba(255, 136, 0, ${opacity})"; // Oranges Leuchten
+                this.ctx.lineWidth = 2 + (4 * (1.0 - p));
+                this.ctx.setLineDash([10, 10]); // Gestrichelt
+            }
+
+            this.ctx.stroke();
+
+            // Optional: Kleine Pfeilspitzen oder Punkte auf der Linie für Richtung
+            this.drawFlowParticle(start, end, conn.type);
+        });
+
+        this.ctx.restore();
+    }
+
+    // Kleines Gimmick: Ein Punkt in der Mitte der Linie
+    drawFlowParticle(start, end, type) {
+        const midX = (start.x + end.x) / 2;
+        const midY = (start.y + end.y) / 2;
+        
+        this.ctx.beginPath();
+        this.ctx.arc(midX, midY, 4, 0, Math.PI*2);
+        this.ctx.fillStyle = type === 'SIGNAL_SOURCE' ? '#0088FF' : '#FF8800';
+        this.ctx.fill();
+    }
+
+    /**
+     * NEU: Zeichnet das Energiefeld um das Objekt
+     */
+    drawAura(obj) {
+        const param = obj.parameterX; // 0.0 bis 1.0
+        
+        // Basis-Größe des Objekts (ca. 45px Radius)
+        const baseRadius = 45; 
+        // Wie weit die Aura maximal strahlt (z.B. nochmal 100px dazu bei Wert 1.0)
+        const extraRadius = param * 120; 
+        const outerRadius = baseRadius + extraRadius;
+
+        this.ctx.save();
+        this.ctx.translate(obj.x, obj.y);
+
+        // Radial Gradient: Innen leuchtend, außen transparent
+        const gradient = this.ctx.createRadialGradient(0, 0, baseRadius * 0.8, 0, 0, outerRadius);
+        
+        // Farbe je nach Wert? (z.B. Blau bei 0, Hellcyan bei 0.5, Weiß bei 1.0)
+        // Wir machen es hier mal simpel: Ein schönes Cyan-Blau.
+        // Die Intensität (Alpha) am Start hängt auch vom Parameter ab.
+        const startAlpha = 0.3 + (param * 0.4); // Min 0.3, Max 0.7
+        gradient.addColorStop(0, `rgba(0, 200, 255, ${startAlpha})`);
+        gradient.addColorStop(1, `rgba(0, 200, 255, 0)`); // Transparent am Rand
+
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
+        this.ctx.fillStyle = gradient;
+        // Global Composite Operation "lighter" lässt Auras schön überlappen
+        this.ctx.globalCompositeOperation = "lighter"; 
+        this.ctx.fill();
+
+        this.ctx.restore();
+    }
+
+    /**
+     * NEU: Zeichnet einen kleinen Bogen über dem Objekt, der den Wert anzeigt.
+     */
+    drawRotationIndicator(param) {
+        // Ein Bogen von links (-90°) nach rechts (+90°) oben über dem Objekt
+        const radius = 60;
+        const startAngle = Math.PI; // Links (180°)
+        const endAngle = Math.PI * 2; // Rechts (360°)
+        
+        // Hintergrund-Bogen (grau)
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, radius, startAngle, endAngle);
+        this.ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+        this.ctx.lineWidth = 3;
+        this.ctx.stroke();
+
+        // Der aktive Wert-Bogen (hell)
+        // Wir mappen 0.0-1.0 auf den Winkelbereich PI bis 2PI
+        const currentAngle = startAngle + (param * Math.PI);
+
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, radius, startAngle, currentAngle);
+        this.ctx.strokeStyle = "#00FFFF"; // Cyan
+        this.ctx.lineWidth = 5;
+        this.ctx.stroke();
+
+        // Kleiner "Knob" am Ende
+        this.ctx.beginPath();
+        // Polar zu Kartesisch umrechnen für die Position
+        const knobX = radius * Math.cos(currentAngle);
+        const knobY = radius * Math.sin(currentAngle);
+        this.ctx.arc(knobX, knobY, 5, 0, Math.PI*2);
+        this.ctx.fillStyle = "#ffffff";
+        this.ctx.fill();
+        
+        // Wert als Text
+        this.ctx.font = "bold 10px monospace";
+        this.ctx.fillStyle = "cyan";
+        this.ctx.fillText(param.toFixed(2), 0, -radius - 10);
     }
    
 }
