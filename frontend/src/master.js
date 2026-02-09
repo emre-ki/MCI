@@ -1,7 +1,14 @@
 import { Turntable } from './Turntable.js';
+import { SocketClient } from './SocketClient.js'; // Import
 
 const canvas = document.getElementById('turntableCanvas');
 const ctx = canvas.getContext('2d');
+
+const socketUrl = window.location.hostname === '10.224.32.7' 
+    ? 'http://localhost:8080' 
+    : `http://${window.location.hostname}:8080`;
+
+const socketClient = new SocketClient(socketUrl);
 
 let width, height;
 let turntable;
@@ -13,7 +20,7 @@ function resize() {
     canvas.height = height;
     
     if (!turntable) {
-        turntable = new Turntable(width, height);
+        turntable = new Turntable(width, height, socketClient);
     } else {
         turntable.resize(width, height);
     }

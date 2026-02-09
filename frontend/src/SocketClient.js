@@ -17,11 +17,7 @@ export class SocketClient {
     send(action, value) {
         if (this.socket.connected) {
             // Wir senden ein kompaktes Objekt, um Bandbreite zu sparen
-            this.socket.emit("turntable-event", {
-                action: action,
-                value: value,
-                timestamp: Date.now()
-            });
+            this.socket.emit(action, value);
         }
     }
 }

@@ -1,5 +1,6 @@
 export class Turntable {
-    constructor(width, height) {
+    constructor(width, height, socketClient) {
+        this.socketClient = socketClient;
         this.resize(width, height);
 
         // Physik
@@ -105,6 +106,10 @@ export class Turntable {
                     // Limitieren
                     if (this.baseSpeed > maxSpeed) this.baseSpeed = maxSpeed;
                     if (this.baseSpeed < -maxSpeed) this.baseSpeed = -maxSpeed;
+
+                    if (this.socketClient) {
+                        this.socketClient.send('cmd', `speed ${Math.round((this.baseSpeed / 0.05) * 1000) / 1000}`);
+                    }
                     
                     // Visuelles Feedback
                     this.angle += delta;
@@ -112,6 +117,10 @@ export class Turntable {
                     // MODUS: SCRATCHEN
                     this.angle += delta;
                     this.velocity = delta;
+
+                    if (this.socketClient) {
+                        this.socketClient.send('cmd', `speed ${this.velocity / 0.05}`);
+                    }
                 }
 
                 this.lastPlatterAngle = currentInputAngle;
@@ -148,6 +157,9 @@ export class Turntable {
         if (!isPlatterHeld || (isPlatterHeld && this.isSpeedMode)) {
             // Interpolation zur BaseSpeed
             this.velocity += (this.baseSpeed - this.velocity) * this.inertia;
+            if ((this.baseSpeed !== this.velocity) && this.socketClient) {
+                this.socketClient.send('cmd', `speed ${this.baseSpeed / 0.05}`);
+            }
             
             // Wenn Platte nicht gehalten wird, dreht sie sich physikalisch
             // Wenn SpeedMode an ist, drehen wir sie manuell im 'move' Event, daher hier nicht addieren
