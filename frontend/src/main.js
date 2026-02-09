@@ -29,7 +29,8 @@ btnRemove.addEventListener('click', () => {
 });
 
 // Muster definieren
-const size = 64; // ca 65px Abstand zwischen Noppen
+const size = 52; // ca 65px Abstand zwischen Noppen
+//const size = 64; // ca 65px Abstand zwischen Noppen
 
 // Tonspuren
 recognizer.addPattern("DRUMS", [
